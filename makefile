@@ -1,5 +1,14 @@
 CC = gcc
-CFLAGS = -Wall -ansi
+CFLAGS = -Iincludes
 
-./bin/p2p : ./src/p2p.c
-	$(CC) -o $@ ./src/p2p.c
+./bin/session : ./src/session.o ./bin/p2p.o
+	$(CC) -o $@ ./src/session.o ./bin/p2p.o
+
+./bin/p2p.o : ./includes/p2p.h ./src/p2p.c
+	$(CC) $(CFLAGS) -o $@ -c ./src/p2p.c
+
+./bin/session.o : ./includes/p2p.h ./src/session.c
+	$(CC) $(CFLAGS) -o $@ -c ./src/session.c
+
+clean :
+	rm ./bin/p2p.o ./bin/session.o
