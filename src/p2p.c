@@ -1,101 +1,80 @@
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include "p2p.h"
 
-int main(int argc, char **argv) {
+/* function initiates network by listening for incoming connections first (server side) */
+int accept_p2p(p2p_struct *session, int port) {
+	int response;
 
-	if (argc < 2) {
-		fprintf(stderr, "Usage: %s <address> <port>\n", argv[0]);
-		return -1;
+	// creates server side socket
+	if ((session->server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "Unable to create server side socket - error %d\n", errno);
+		return session->server_socket;
 	}
-	char *addr = argv[1];
-	int port = (argv[2] != NULL) ? atoi(argv[2]) : 8080;
 
-	/* CLIENT SIDE CONNECTION SETUP 
-	 * socket
-	 * connect
-	 * send / recieve
-	 */
+	// connection settings
+	session->client_addr.sin_family = AF_INET;
+	session->client_addr.sin_port = htons(port);
+	session->client_addr.sin_addr.s_addr = INADDR_ANY;
 
-	int client_socket;
-	struct sockaddr_in server_addr;
+	// binds socket to port
+	if ((response = bind(session->server_socket, (struct sockaddr*)&(session->client_addr), sizeof(session->client_addr))) < 0) {
+		fprintf(stderr, "Unable to bind port - error %d\n", errno);
+		return response;
+	}
 
-	// socket creation
-	if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+	// listen on socket/port
+	// maximum of 1 pending connection
+	if ((response = listen(session->server_socket, 1)) < 0) {
+		fprintf(stderr, "Unable to listen on port %d - error %d\n", port, errno);
+		return response;
+	}
+
+	fprintf(stderr, "Establishing server side connection...");
+	if((session->conn = accept(session->server_socket, (struct sockaddr*)&(session->client_addr), (socklen_t*)sizeof(session->client_addr))) < 0) {
+		fprintf(stderr, "\nConnection failure - error %d\n", errno);
+		return session->conn;
+	}
+
+	return 1;
+}
+
+/* function connects to existing p2p network (client side) */
+int connect_p2p(p2p_struct *session, int port, char *addr) {
+	
+	// creates client side socket
+	if ((session->client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		fprintf(stderr, "Unable to create client side socket - error %d\n", errno);
-		return -1;
+		return session->client_socket;
 	}
 
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(port);
-
-	// converts IPv4 and IPv6 addresses from text to binary form
-	if ((inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr)) <= 0) {
+	// sets connection settings
+	session->server_addr.sin_family = AF_INET;
+	session->server_addr.sin_port = htons(port);
+	if ((inet_pton(AF_INET, addr, &session->server_addr.sin_addr)) <= 0) {
 		fprintf(stderr, "Invalid IP address - error %d\n", errno);
 		return -1;
 	}
 
-	/* SERVER SIDE CONNECTION SETUP 
-	 * socket
-	 * setsockopt
-	 * bind
-	 * listen
-	 * accept
-	 * send / recieve
-	 */
-	int server_socket, conn_socket;
-	int opt = 1;
-	struct sockaddr_in client_addr;
-	
-	// socket creation
-	if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-		fprintf(stderr, "Unable to create server side socket - error %d\n", errno);
+	// creates connection
+	fprintf(stderr, "Establishing client side connection...");
+	if (connect(session->client_socket, (struct sockaddr*)&(session->server_addr), sizeof(session->server_addr)) < 0) {
+		fprintf(stderr, "\nUnable to connect - error %d\n", errno);
 		return -1;
 	}
+	fprintf(stderr, "connected\n");
 
-	client_addr.sin_family = AF_INET;
-	client_addr.sin_addr.s_addr = INADDR_ANY;
-	client_addr.sin_port = htons(port);
+	return 1;
+}
 
-	// bind socket to port 8080
-	if (bind(server_socket, (struct sockaddr*)&client_addr, sizeof(client_addr)) == -1) {
-		fprintf(stderr, "Failure to bind socket to port %d - error %d\n", port);
-		return -1;
-	}
+/* deallocates memory for p2p session */
+void close_p2p(p2p_struct *session) {
+	close(session->client_socket);
+	close(session->server_socket);
+	free(session);
+	return;
+}
 
-	// listens for incoming connections
-	// maximum of 1 pending connections
-	if (listen(server_socket, 1) == -1) {
-		fprintf(stderr, "Unable to listen on port %d - error %d", port, errno);
-		return -1;
-	}
-
-	// server side connection
-	fprintf(stdout, "Establishing server side connection...\n");
-	if ((conn_socket = accept(server_socket, (struct sockaddr*)&client_addr, (socklen_t*)sizeof(client_addr))) == -1) {
-		fprintf(stderr, "Failure to accept connection - error %d\n", errno);
-		return -1;
-	}
-
-	// client side connection
-	fprintf(stdout, "Establishing client side connection...\n");
-	if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-		fprintf(stderr, "Connection failure - error %d\n", errno);
-		return -1;
-	}
-
-	// input sequence
-	char input[2048];
-	while (1) {
-		fprintf(stdout, ">");
-		fscanf(stdin, "%s", input);
-		send(conn_socket, input, strlen(input), 0);
-	}
-
-	return 0;
+/* allocates memory for p2p session */
+void init_p2p(p2p_struct *session) {
+	memset(session, 0, sizeof(session));	
+	return;
 }
