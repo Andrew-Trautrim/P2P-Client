@@ -21,11 +21,10 @@ typedef struct {
 	int conn;
 } p2p_struct;
 
-int accept_p2p(p2p_struct *session, int port);
-int connect_p2p(p2p_struct *session, int port, char* ip);
-int init_p2p_session(p2p_struct *session); // initiates sockets and main functionality
+int accept_p2p(p2p_struct *conn, int port); // listens/accepts incoming connections
+int connect_p2p(p2p_struct *session, int port, char* ip); // searches for connections to create
+int transfer_data_p2p(p2p_struct *session); // transfers data once connection is established
 
-void close_p2p(p2p_struct *session); // deallocated memory
-void init_p2p(p2p_struct *session); // allocates memory for p2p session
+void close_p2p(p2p_struct *session); // deallocates memory/closes sockets
 
 #endif

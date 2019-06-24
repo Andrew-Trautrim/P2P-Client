@@ -17,7 +17,7 @@ int accept_p2p(p2p_struct *session, int port) {
 
 	// binds socket to port
 	if ((response = bind(session->server_socket, (struct sockaddr*)&(session->client_addr), sizeof(session->client_addr))) < 0) {
-		fprintf(stderr, "Unable to bind port - error %d\n", errno);
+		fprintf(stderr, "Unable to bind port %d - error %d\n", port, errno);
 		return response;
 	}
 
@@ -29,10 +29,12 @@ int accept_p2p(p2p_struct *session, int port) {
 	}
 
 	fprintf(stderr, "Establishing server side connection...");
-	if((session->conn = accept(session->server_socket, (struct sockaddr*)&(session->client_addr), (socklen_t*)sizeof(session->client_addr))) < 0) {
+	int addrlen = sizeof(session->client_addr);
+	if((session->conn = accept(session->server_socket, (struct sockaddr*)&(session->client_addr), (socklen_t*)&addrlen)) < 0) {
 		fprintf(stderr, "\nConnection failure - error %d\n", errno);
 		return session->conn;
 	}
+	fprintf(stderr, "connected\n");
 
 	return 1;
 }
@@ -65,16 +67,10 @@ int connect_p2p(p2p_struct *session, int port, char *addr) {
 	return 1;
 }
 
-/* deallocates memory for p2p session */
+/* deallocates memory and closes sockets*/
 void close_p2p(p2p_struct *session) {
 	close(session->client_socket);
 	close(session->server_socket);
 	free(session);
-	return;
-}
-
-/* allocates memory for p2p session */
-void init_p2p(p2p_struct *session) {
-	memset(session, 0, sizeof(session));	
 	return;
 }

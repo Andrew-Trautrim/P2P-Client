@@ -8,17 +8,19 @@ int main(int argc, char **argv) {
 	}
 	char *addr = argv[1];
 	int port = (argv[2] != NULL) ? atoi(argv[2]) : PORT; // default port is 8080
-	
-	p2p_struct *session;
-	init_p2p(session);
+	p2p_struct *session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
 
-	int response;
+	// creating connection
 	if (LISTEN) {
-		if ((response = accept_p2p(session, port)) < 0)
-			return response;
+		if (accept_p2p(session, port) < 0) {
+			close_p2p(session);
+			return -1;
+		}
 	} else {
-		if ((response = connect_p2p(session, port, addr)) < 0)
-			return response;
+		if (connect_p2p(session, port, addr) < 0) {
+			close_p2p(session)
+			return -1;
+		}
 	}
 
 	close_p2p(session);
