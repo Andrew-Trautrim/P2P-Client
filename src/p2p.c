@@ -30,9 +30,9 @@ int accept_p2p(p2p_struct *session, int port) {
 
 	fprintf(stderr, "Establishing server side connection...");
 	int addrlen = sizeof(session->client_addr);
-	if((session->conn = accept(session->server_socket, (struct sockaddr*)&(session->client_addr), (socklen_t*)&addrlen)) < 0) {
+	if((session->connection = accept(session->server_socket, (struct sockaddr*)&(session->client_addr), (socklen_t*)&addrlen)) < 0) {
 		fprintf(stderr, "\nConnection failure - error %d\n", errno);
-		return session->conn;
+		return session->connection;
 	}
 	fprintf(stderr, "connected\n");
 
@@ -64,6 +64,33 @@ int connect_p2p(p2p_struct *session, int port, char *addr) {
 	}
 	fprintf(stderr, "connected\n");
 
+	return 1;
+}
+
+/* sends user data to connection */
+int transfer_data(p2p_struct *session) {
+
+	char buffer[1024];
+	int nbytes;
+	do {
+	 	fprintf(stdout, ">");
+		fgets(buffer, 1024, stdin);
+		buffer[strlen(buffer)-1] = '\0';
+		nbytes = send(session->client_socket, buffer, sizeof(buffer), 0);
+	} while (nbytes > 0);
+
+	return 1;
+}
+
+/* recieves data from connection */
+int recieve_data(p2p_struct *session) {
+	
+	char buffer[1024];
+	int nbytes;
+	do {
+		nbytes = read(session->connection, buffer, sizeof(buffer));
+		fprintf(stdout, "[*] %s\n", buffer);
+	} while (nbytes > 0);
 	return 1;
 }
 

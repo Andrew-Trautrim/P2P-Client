@@ -16,9 +16,17 @@ int main(int argc, char **argv) {
 			close_p2p(session);
 			return -1;
 		}
+		if (recieve_data(session) < 0) {
+			close_p2p(session);
+			return -1;
+		}
 	} else {
 		if (connect_p2p(session, port, addr) < 0) {
-			close_p2p(session)
+			close_p2p(session);
+			return -1;
+		}
+		if (transfer_data(session) < 0) {
+			close_p2p(session);
 			return -1;
 		}
 	}
