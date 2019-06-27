@@ -67,29 +67,22 @@ int connect_p2p(p2p_struct *session, int port, char *addr) {
 	return 1;
 }
 
-/* sends user data to connection */
+/* transfers data back and forth from connections */
 int transfer_data(p2p_struct *session) {
-
-	char buffer[1024];
+	char input[1024];
+	char output[1024];
 	int nbytes;
 	do {
-	 	fprintf(stdout, ">");
-		fgets(buffer, 1024, stdin);
-		buffer[strlen(buffer)-1] = '\0';
-		nbytes = send(session->client_socket, buffer, sizeof(buffer), 0);
-	} while (nbytes > 0);
-
-	return 1;
-}
-
-/* recieves data from connection */
-int recieve_data(p2p_struct *session) {
-	
-	char buffer[1024];
-	int nbytes;
-	do {
-		nbytes = read(session->connection, buffer, sizeof(buffer));
-		fprintf(stdout, "[*] %s\n", buffer);
+		// attempts to read incoming data first
+		if ((nbytes = read(session->connection, input, sizeof(input))) > 0)
+			fprintf(stdout, "[*] %s\n", input);
+		// sends data otherwise
+		else {
+			fprintf(stdout, "> ");
+			fgets(input, 1024, stdin);
+			input[strlen(input)-1] = '\0';
+			nbytes = send(session->connection, input, sizeof(input), 0);
+		}
 	} while (nbytes > 0);
 	return 1;
 }
