@@ -1,18 +1,20 @@
 #include "p2p.h"
 
+void print_usage();
+
 int main(int argc, char **argv) {
 
-	static char *options = "a:lp:";
+	static char *options = "a:hlp:";
 
 	int opt;
 	int listen = 0;
 	int port = 8080;
-	char *addr;
+	char *addr = NULL;
 	p2p_struct *session;
 
 	// proper usage
 	if (argc < 2) {
-		fprintf(stderr, "Improper usage: %s [options]\n", argv[0]);
+		fprintf(stderr, "usage: %s <options>\ntype \'-h\' for help\n", argv[0]);
 		return -1;
 	}
 
@@ -22,16 +24,24 @@ int main(int argc, char **argv) {
 			case 'a':
 				addr = optarg;
 				break;
+			case 'h':
+				print_usage();
+				return -1;
 			case 'l':
 				listen = 1;
 				break;
 			case 'p':
 				port = atoi(optarg);
 				break;
+			case '?':
+				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
+				return -1;
 			default:
-				fprintf(stderr, "Invalid argument, \'-%c\'\n", opt);
+				// getopt error, displays own error message
+				return -1;
 		}
 	}
+
 	session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
 
 	// creating connection
@@ -61,4 +71,13 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
-
+/* prints help message for proper usage */
+void print_usage() {
+	fprintf(stdout, "usage: ./session <options>\n\n");
+	fprintf(stdout, "Options:\n");
+	fprintf(stdout, "	-a address : target address\n");
+	fprintf(stdout, "	-h	   : display help options\n");
+	fprintf(stdout, "	-l	   : listen for incoming connections\n");
+	fprintf(stdout, "	-p port	   : port\n");
+	return;
+}
