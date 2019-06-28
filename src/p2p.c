@@ -41,7 +41,7 @@ int accept_p2p(p2p_struct *session, int port) {
 
 /* function connects to existing p2p network (client side) */
 int connect_p2p(p2p_struct *session, int port, char *addr) {
-	
+
 	// creates client side socket
 	if ((session->client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		fprintf(stderr, "Unable to create client side socket - error %d\n", errno);
@@ -52,13 +52,19 @@ int connect_p2p(p2p_struct *session, int port, char *addr) {
 	session->server_addr.sin_family = AF_INET;
 	session->server_addr.sin_port = htons(port);
 	if ((inet_pton(AF_INET, addr, &session->server_addr.sin_addr)) <= 0) {
-		fprintf(stderr, "Invalid IP address - error %d\n", errno);
+		fprintf(stderr, "Invalid IP address: %s - error %d\n", addr, errno);
 		return -1;
 	}
 
-	// creates connection
+	// client side connection
+	// continuous connection attempts after 2s delay
 	fprintf(stderr, "Establishing client side connection...");
-	if (connect(session->client_socket, (struct sockaddr*)&(session->server_addr), sizeof(session->server_addr)) < 0) {
+	int response = -1;
+	for(int i = 0; i < 5 && response == -1; ++i) {
+		response = connect(session->client_socket, (struct sockaddr*)&(session->server_addr), sizeof(session->server_addr));
+		delay(2000000);
+	}
+	if (response == -1) {
 		fprintf(stderr, "\nUnable to connect - error %d\n", errno);
 		return -1;
 	}
@@ -74,14 +80,15 @@ int transfer_data(p2p_struct *session) {
 	int nbytes;
 	do {
 		// attempts to read incoming data first
-		if ((nbytes = read(session->connection, input, sizeof(input))) > 0)
+		if ((nbytes = read(session->connection, input, sizeof(input))) > 0) {
 			fprintf(stdout, "[*] %s\n", input);
 		// sends data otherwise
-		else {
+		} else {
 			fprintf(stdout, "> ");
 			fgets(input, 1024, stdin);
 			input[strlen(input)-1] = '\0';
-			nbytes = send(session->connection, input, sizeof(input), 0);
+			if (strlen(input) > 0)
+				nbytes = send(session->client_socket, input, sizeof(input), 0);
 		}
 	} while (nbytes > 0);
 	return 1;
@@ -91,6 +98,14 @@ int transfer_data(p2p_struct *session) {
 void close_p2p(p2p_struct *session) {
 	close(session->client_socket);
 	close(session->server_socket);
+	close(session->connection);
 	free(session);
 	return;
+}
+
+/* function delays a specified interval */
+void delay(int ticks) {
+	clock_t start = clock();
+	while(clock() < (start + ticks))
+		;
 }

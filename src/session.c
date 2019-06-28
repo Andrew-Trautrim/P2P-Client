@@ -2,16 +2,40 @@
 
 int main(int argc, char **argv) {
 
+	static char *options = "a:lp:";
+
+	int opt;
+	int listen = 0;
+	int port = 8080;
+	char *addr;
+	p2p_struct *session;
+
+	// proper usage
 	if (argc < 2) {
-		fprintf(stderr, "Usage: %s <address> <port>\n", argv[0]);
+		fprintf(stderr, "Improper usage: %s [options]\n", argv[0]);
 		return -1;
 	}
-	char *addr = argv[1];
-	int port = (argv[2] != NULL) ? atoi(argv[2]) : PORT; // default port is 8080
-	p2p_struct *session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
+
+	// command line argument(s)
+	while((opt = getopt(argc, argv, options)) != -1) {
+		switch (opt) {
+			case 'a':
+				addr = optarg;
+				break;
+			case 'l':
+				listen = 1;
+				break;
+			case 'p':
+				port = atoi(optarg);
+				break;
+			default:
+				fprintf(stderr, "Invalid argument, \'-%c\'\n", opt);
+		}
+	}
+	session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
 
 	// creating connection
-	if (LISTEN) {
+	if (listen) {
 		if (accept_p2p(session, port) < 0) {
 			close_p2p(session);
 			return -1;
@@ -36,3 +60,5 @@ int main(int argc, char **argv) {
 	close_p2p(session);
 	return 0;
 }
+
+
