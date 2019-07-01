@@ -6,10 +6,11 @@ int main(int argc, char **argv) {
 
 	static char *options = "a:hlp:";
 
-	int opt;
+	int opt, nbytes;
 	int listen = 0;
 	int port = 8080;
 	char *addr = NULL;
+	p2p_header *header;
 	p2p_struct *session;
 
 	// proper usage
@@ -41,8 +42,13 @@ int main(int argc, char **argv) {
 				return -1;
 		}
 	}
+	if (addr == NULL) {
+		fprintf(stderr, "No address specified\ntype \'-h\' for help\n");
+		return -1;
+	}
 
 	session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
+	header = (p2p_header*)calloc(1, sizeof(p2p_header));
 
 	// creating connection
 	if (listen) {
@@ -50,15 +56,39 @@ int main(int argc, char **argv) {
 			close_p2p(session);
 			return -1;
 		}
-		if (connect_p2p(session, port, addr) < 0) {
+		
+		nbytes = read(session->connection, header, sizeof(p2p_header));
+
+		if (connect_p2p(session, port, header->local_ip) < 0) {
 			close_p2p(session);
 			return -1;
 		}
 	} else {
-		if (connect_p2p(session, port, addr) < 0) {
+		uint8_t ip = inet_pton(AF_INET, addr,)
+		if (connect_p2p(session, port, ) < 0) {
 			close_p2p(session);
 			return -1;
 		}
+
+		// connection info
+		char host_buff[256];
+		struct hostent *host_entry;
+		int host_name;
+
+		// retrieve host information for header data
+		if (gethostname(host_buff, sizeof(host_buff)) == -1 || (host_entry = gethostbyname(host_buff)) == NULL) {
+			fprintf(stderr, "Unable to retrieve host information\n", errno);
+			close_p2p(session);
+			return -1;
+		}
+
+		// set header informaton
+		header->local_ip = host_entry->h_addr_list[0];
+		header->port = port;
+		// send connection data
+		nbytes = send(session->client_socket, header, sizeof(p2p_header), 0);
+
+		// accept incoming connection
 		if (accept_p2p(session, port) < 0) {
 			close_p2p(session);
 			return -1;

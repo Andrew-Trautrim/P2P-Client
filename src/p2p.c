@@ -1,7 +1,7 @@
 #include "p2p.h"
 
 /* function initiates network by listening for incoming connections first (server side) */
-int accept_p2p(p2p_struct *session, int port) {
+int accept_p2p(p2p_struct *session, short int port) {
 	int response;
 
 	// creates server side socket
@@ -40,7 +40,7 @@ int accept_p2p(p2p_struct *session, int port) {
 }
 
 /* function connects to existing p2p network (client side) */
-int connect_p2p(p2p_struct *session, int port, char *addr) {
+int connect_p2p(p2p_struct *session, short int port, unsigned long addr) {
 
 	// creates client side socket
 	if ((session->client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -48,13 +48,10 @@ int connect_p2p(p2p_struct *session, int port, char *addr) {
 		return session->client_socket;
 	}
 
-	// sets connection settings
+	// connection settings
 	session->server_addr.sin_family = AF_INET;
 	session->server_addr.sin_port = htons(port);
-	if ((inet_pton(AF_INET, addr, &session->server_addr.sin_addr)) <= 0) {
-		fprintf(stderr, "Invalid IP address: %s - error %d\n", addr, errno);
-		return -1;
-	}
+	session->server_addr.sin_addr.s_addr = addr;
 
 	// client side connection
 	// continuous connection attempts after 2s delay
@@ -62,7 +59,7 @@ int connect_p2p(p2p_struct *session, int port, char *addr) {
 	int response = -1;
 	for(int i = 0; i < 5 && response == -1; ++i) {
 		response = connect(session->client_socket, (struct sockaddr*)&(session->server_addr), sizeof(session->server_addr));
-		delay(2000000);
+		delay(100000);
 	}
 	if (response == -1) {
 		fprintf(stderr, "\nUnable to connect - error %d\n", errno);
