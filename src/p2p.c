@@ -40,7 +40,7 @@ int accept_p2p(p2p_struct *session, short int port) {
 }
 
 /* function connects to existing p2p network (client side) */
-int connect_p2p(p2p_struct *session, short int port, unsigned long addr) {
+int connect_p2p(p2p_struct *session, short int port) {
 
 	// creates client side socket
 	if ((session->client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -51,7 +51,6 @@ int connect_p2p(p2p_struct *session, short int port, unsigned long addr) {
 	// connection settings
 	session->server_addr.sin_family = AF_INET;
 	session->server_addr.sin_port = htons(port);
-	session->server_addr.sin_addr.s_addr = addr;
 
 	// client side connection
 	// continuous connection attempts after 2s delay

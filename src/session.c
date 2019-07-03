@@ -42,10 +42,6 @@ int main(int argc, char **argv) {
 				return -1;
 		}
 	}
-	if (addr == NULL) {
-		fprintf(stderr, "No address specified\ntype \'-h\' for help\n");
-		return -1;
-	}
 
 	session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
 	header = (p2p_header*)calloc(1, sizeof(p2p_header));
@@ -54,19 +50,34 @@ int main(int argc, char **argv) {
 	if (listen) {
 		if (accept_p2p(session, port) < 0) {
 			close_p2p(session);
+			free(header);
 			return -1;
 		}
 		
-		nbytes = read(session->connection, header, sizeof(p2p_header));
-
-		if (connect_p2p(session, port, header->local_ip) < 0) {
+		if (nbytes = read(session->connection, header, sizeof(p2p_header)) < 0) {
+			fprintf(stderr, "Unable to read incoming data - error %d\n", errno);
 			close_p2p(session);
+			free(header);
+			return -1;
+		}
+
+		session->client_addr.sin_addr.s_addr = header->local_addr.s_addr;
+		if (connect_p2p(session, port) < 0) {
+			close_p2p(session);
+			free(header);
 			return -1;
 		}
 	} else {
-		uint8_t ip = inet_pton(AF_INET, addr,)
-		if (connect_p2p(session, port, ) < 0) {
+		if (inet_pton(AF_INET, addr, &session->server_addr.sin_addr) <= 0) {
+			fprintf(stderr, "Invalid address - error %d\n", errno);
 			close_p2p(session);
+			free(header);
+			return -1;
+		}
+
+		if (connect_p2p(session, port) < 0) {
+			close_p2p(session);
+			free(header);
 			return -1;
 		}
 
@@ -79,18 +90,24 @@ int main(int argc, char **argv) {
 		if (gethostname(host_buff, sizeof(host_buff)) == -1 || (host_entry = gethostbyname(host_buff)) == NULL) {
 			fprintf(stderr, "Unable to retrieve host information\n", errno);
 			close_p2p(session);
+			free(header);
 			return -1;
 		}
 
 		// set header informaton
-		header->local_ip = host_entry->h_addr_list[0];
+		inet_aton(host_entry->h_addr_list[0], &header->local_addr);
 		header->port = port;
-		// send connection data
-		nbytes = send(session->client_socket, header, sizeof(p2p_header), 0);
+		// send header
+		if (nbytes = send(session->client_socket, header, sizeof(p2p_header), 0) < 0) {
+			fprintf(stderr, "Unable to send data - error %d\n", errno);
+			close_p2p(session);
+			free(header);
+		}
 
 		// accept incoming connection
 		if (accept_p2p(session, port) < 0) {
 			close_p2p(session);
+			free(header);
 			return -1;
 		}
 	}
@@ -98,6 +115,7 @@ int main(int argc, char **argv) {
 	transfer_data(session);
 
 	close_p2p(session);
+	free(header);
 	return 0;
 }
 
