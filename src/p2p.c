@@ -58,7 +58,7 @@ int connect_p2p(p2p_struct *session, short int port) {
 	int response = -1;
 	for(int i = 0; i < 5 && response == -1; ++i) {
 		response = connect(session->client_socket, (struct sockaddr*)&(session->server_addr), sizeof(session->server_addr));
-		delay(100000);
+		sleep(3);
 	}
 	if (response == -1) {
 		fprintf(stderr, "\nUnable to connect - error %d\n", errno);
@@ -66,27 +66,6 @@ int connect_p2p(p2p_struct *session, short int port) {
 	}
 	fprintf(stderr, "connected\n");
 
-	return 1;
-}
-
-/* transfers data back and forth from connections */
-int transfer_data(p2p_struct *session) {
-	char input[1024];
-	char output[1024];
-	int nbytes;
-	do {
-		// attempts to read incoming data first
-		if ((nbytes = read(session->connection, input, sizeof(input))) > 0) {
-			fprintf(stdout, "[*] %s\n", input);
-		// sends data otherwise
-		} else {
-			fprintf(stdout, "> ");
-			fgets(input, 1024, stdin);
-			input[strlen(input)-1] = '\0';
-			if (strlen(input) > 0)
-				nbytes = send(session->client_socket, input, sizeof(input), 0);
-		}
-	} while (nbytes > 0);
 	return 1;
 }
 
@@ -99,9 +78,26 @@ void close_p2p(p2p_struct *session) {
 	return;
 }
 
-/* function delays a specified interval */
-void delay(int ticks) {
-	clock_t start = clock();
-	while(clock() < (start + ticks))
-		;
+void *recieve_data(void *arg) {
+	p2p_struct *session = (p2p_struct*)arg;
+	char buffer[1024];
+	int nbytes;
+	do {
+		nbytes = read(session->connection, buffer, sizeof(buffer));
+		fprintf(stdout, "[*] %s\n", buffer);
+	} while (nbytes > 0 && strcmp("X", buffer) != 0);
+	return NULL;
+}
+
+/* recieves/prints incoming data from established connection(s) */
+void *send_data(void *arg) {
+	p2p_struct *session = (p2p_struct*)arg;
+	char buffer[1024];
+	int nbytes;
+	do {
+		fgets(buffer, 1024, stdin);
+		buffer[strlen(buffer)-1] = '\0';
+		send(session->client_socket, buffer, sizeof(buffer), 0);
+	} while (nbytes > 0 && strcmp("X", buffer) != 0);
+	return NULL;
 }

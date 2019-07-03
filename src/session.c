@@ -4,11 +4,12 @@ void print_usage();
 
 int main(int argc, char **argv) {
 
-	static char *options = "a:hlp:";
+	static char *options = "a:hlp:t:";
 
 	int opt, nbytes;
 	int listen = 0;
-	int port = 8080;
+	int target_port = 8080;
+	int local_port = 8080;
 	char *addr = NULL;
 	p2p_header *header;
 	p2p_struct *session;
@@ -32,7 +33,10 @@ int main(int argc, char **argv) {
 				listen = 1;
 				break;
 			case 'p':
-				port = atoi(optarg);
+				local_port = atoi(optarg);
+				break;
+			case 't':
+				target_port = atoi(optarg);
 				break;
 			case '?':
 				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
@@ -48,21 +52,24 @@ int main(int argc, char **argv) {
 
 	// creating connection
 	if (listen) {
-		if (accept_p2p(session, port) < 0) {
+		if (accept_p2p(session, local_port) < 0) {
 			close_p2p(session);
 			free(header);
 			return -1;
 		}
 		
+		// read incoming connection data to establish client side connection
+		fprintf(stderr, "Reading incoming data...");
 		if (nbytes = read(session->connection, header, sizeof(p2p_header)) < 0) {
-			fprintf(stderr, "Unable to read incoming data - error %d\n", errno);
+			fprintf(stderr, "\nUnable to read incoming data - error %d\n", errno);
 			close_p2p(session);
 			free(header);
 			return -1;
 		}
+		fprintf(stderr, "recieved\n");
 
 		session->client_addr.sin_addr.s_addr = header->local_addr.s_addr;
-		if (connect_p2p(session, port) < 0) {
+		if (connect_p2p(session, header->port) < 0) {
 			close_p2p(session);
 			free(header);
 			return -1;
@@ -75,7 +82,7 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 
-		if (connect_p2p(session, port) < 0) {
+		if (connect_p2p(session, target_port) < 0) {
 			close_p2p(session);
 			free(header);
 			return -1;
@@ -96,8 +103,9 @@ int main(int argc, char **argv) {
 
 		// set header informaton
 		inet_aton(host_entry->h_addr_list[0], &header->local_addr);
-		header->port = port;
+		header->port = local_port;
 		// send header
+		fprintf(stderr, "Sending local information\n");
 		if (nbytes = send(session->client_socket, header, sizeof(p2p_header), 0) < 0) {
 			fprintf(stderr, "Unable to send data - error %d\n", errno);
 			close_p2p(session);
@@ -105,14 +113,19 @@ int main(int argc, char **argv) {
 		}
 
 		// accept incoming connection
-		if (accept_p2p(session, port) < 0) {
+		if (accept_p2p(session, local_port) < 0) {
 			close_p2p(session);
 			free(header);
 			return -1;
 		}
 	}
-	// send/recieve data from connetion
-	transfer_data(session);
+	
+	fprintf(stdout, "Session (type \'X\' to exit): \n");
+
+	// multithreading
+	pthread_t thread;
+	pthread_create(&thread, NULL, send_data, session);
+	recieve_data(session);
 
 	close_p2p(session);
 	free(header);
@@ -126,6 +139,7 @@ void print_usage() {
 	fprintf(stdout, "	-a address : target address\n");
 	fprintf(stdout, "	-h	   : display help options\n");
 	fprintf(stdout, "	-l	   : listen for incoming connections\n");
-	fprintf(stdout, "	-p port	   : port\n");
+	fprintf(stdout, "	-p port	   : local port for accepting connections\n");
+	fprintf(stdout, "	-t port    : target port for connecting\n");
 	return;
 }

@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,9 +34,10 @@ typedef struct {
 
 int accept_p2p(p2p_struct *conn, short int port); // listens/accepts incoming connections
 int connect_p2p(p2p_struct *session, short int port); // searches for connections to create
-int transfer_data(p2p_struct *session); // send/revcieve data once connection is established
 
 void close_p2p(p2p_struct *session); // deallocates memory/closes sockets
-void delay(int ticks);
+
+void *recieve_data(void *arg); // send data to connection
+void *send_data(void *arg); // recieve data from connection
 
 #endif

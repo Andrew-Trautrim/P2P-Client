@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Iincludes
 
 ./bin/session: ./bin/session.o ./bin/p2p.o
-	$(CC) -o $@ ./bin/session.o ./bin/p2p.o
+	$(CC) -o $@ ./bin/session.o ./bin/p2p.o -lpthread
 
 ./bin/p2p.o : ./includes/p2p.h ./src/p2p.c
 	$(CC) $(CFLAGS) -o $@ -c ./src/p2p.c
