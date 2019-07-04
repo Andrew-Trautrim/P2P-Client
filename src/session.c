@@ -8,22 +8,19 @@ int main(int argc, char **argv) {
 
 	int opt, nbytes;
 	int listen = 0;
+	int connect = 0;
 	int target_port = 8080;
 	int local_port = 8080;
 	char *addr = NULL;
 	p2p_header *header;
-	p2p_struct *session;
-
-	// proper usage
-	if (argc < 2) {
-		fprintf(stderr, "usage: %s <options>\ntype \'-h\' for help\n", argv[0]);
-		return -1;
-	}
+	p2p_struct *client;
+	p2p_struct *server;
 
 	// command line argument(s)
 	while((opt = getopt(argc, argv, options)) != -1) {
 		switch (opt) {
 			case 'a':
+				connect = 1;
 				addr = optarg;
 				break;
 			case 'h':
@@ -47,43 +44,50 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	session = (p2p_struct *)calloc(1, sizeof(p2p_struct));
-	header = (p2p_header*)calloc(1, sizeof(p2p_header));
+	// program must either listen or connect or both
+	if (!listen && !connect) {
+		fprintf(stderr, "Improper usage, use \'-l\' and/or \'-a\' to connect\ntype \'-h\' for help\n");
+		return -1;
+	}
 
 	// creating connection
+	header = (p2p_header*)calloc(1, sizeof(p2p_header));
 	if (listen) {
-		if (accept_p2p(session, local_port) < 0) {
-			close_p2p(session);
+
+		server = init_p2p();
+
+		if (accept_p2p(server, local_port, server->nconn) < 0) {
+			close_p2p(server);
 			free(header);
 			return -1;
 		}
 		
 		// read incoming connection data to establish client side connection
 		fprintf(stderr, "Reading incoming data...");
-		if (nbytes = read(session->connection, header, sizeof(p2p_header)) < 0) {
+		if (nbytes = read(server->connection[server->nconn], header, sizeof(p2p_header)) < 0) {
 			fprintf(stderr, "\nUnable to read incoming data - error %d\n", errno);
-			close_p2p(session);
+			close_p2p(server);
 			free(header);
 			return -1;
 		}
 		fprintf(stderr, "recieved\n");
 
-		session->client_addr.sin_addr.s_addr = header->local_addr.s_addr;
-		if (connect_p2p(session, header->port) < 0) {
-			close_p2p(session);
-			free(header);
-			return -1;
-		}
-	} else {
-		if (inet_pton(AF_INET, addr, &session->server_addr.sin_addr) <= 0) {
+		server->nconn++;
+	} 
+	
+	if (connect) {
+
+		client = init_p2p();
+
+		if (inet_pton(AF_INET, addr, &client->addr[0].sin_addr) <= 0) {
 			fprintf(stderr, "Invalid address - error %d\n", errno);
-			close_p2p(session);
+			close_p2p(client);
 			free(header);
 			return -1;
 		}
 
-		if (connect_p2p(session, target_port) < 0) {
-			close_p2p(session);
+		if (connect_p2p(client, target_port, client->nconn) < 0) {
+			close_p2p(client);
 			free(header);
 			return -1;
 		}
@@ -95,8 +99,8 @@ int main(int argc, char **argv) {
 
 		// retrieve host information for header data
 		if (gethostname(host_buff, sizeof(host_buff)) == -1 || (host_entry = gethostbyname(host_buff)) == NULL) {
-			fprintf(stderr, "Unable to retrieve host information\n", errno);
-			close_p2p(session);
+			fprintf(stderr, "Unable to retrieve host information - error %d\n", errno);
+			close_p2p(client);
 			free(header);
 			return -1;
 		}
@@ -106,28 +110,33 @@ int main(int argc, char **argv) {
 		header->port = local_port;
 		// send header
 		fprintf(stderr, "Sending local information\n");
-		if (nbytes = send(session->client_socket, header, sizeof(p2p_header), 0) < 0) {
+		if (nbytes = send(client->socket[client->nconn], header, sizeof(p2p_header), 0) < 0) {
 			fprintf(stderr, "Unable to send data - error %d\n", errno);
-			close_p2p(session);
+			close_p2p(client);
 			free(header);
 		}
 
-		// accept incoming connection
-		if (accept_p2p(session, local_port) < 0) {
-			close_p2p(session);
-			free(header);
-			return -1;
-		}
+		client->nconn++;
 	}
 	
 	fprintf(stdout, "Session (type \'X\' to exit): \n");
 
 	// multithreading
-	pthread_t thread;
-	pthread_create(&thread, NULL, send_data, session);
-	recieve_data(session);
+	pthread_t client_send;
+	pthread_t client_recieve;
+	pthread_t server_send;
+	pthread_t server_recieve;
+	if (listen) {
+		pthread_create(&server_send, NULL, send_data, server);
+		pthread_create(&server_recieve, NULL, recieve_data, server);
+	}
+	if (connect) {
+		pthread_create(&client_send, NULL, send_data, client);
+		pthread_create(&client_recieve, NULL, recieve_data, client);
+	}
 
-	close_p2p(session);
+	close_p2p(client);
+	close_p2p(server);
 	free(header);
 	return 0;
 }
@@ -135,8 +144,8 @@ int main(int argc, char **argv) {
 /* prints help message for proper usage */
 void print_usage() {
 	fprintf(stdout, "usage: ./session <options>\n\n");
-	fprintf(stdout, "Options:\n");
-	fprintf(stdout, "	-a address : target address\n");
+	fprintf(stdout, "options:\n");
+	fprintf(stdout, "	-a address : connect to target address\n");
 	fprintf(stdout, "	-h	   : display help options\n");
 	fprintf(stdout, "	-l	   : listen for incoming connections\n");
 	fprintf(stdout, "	-p port	   : local port for accepting connections\n");

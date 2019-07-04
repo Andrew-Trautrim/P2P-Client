@@ -14,7 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define PORT 8080
+#define N 5 // max number of connections per device
 
 typedef struct {
 	// address of the sender
@@ -23,20 +23,23 @@ typedef struct {
 	unsigned short port;
 } p2p_header;
 
-/* structure that maintains connetion(s) */
+/* structure maintains connection(s)
+ * can act as client or server */
 typedef struct {
-	struct sockaddr_in client_addr;
-	int client_socket;
-	struct sockaddr_in server_addr;
-	int server_socket;
-	int connection;
+	int nconn;
+	struct sockaddr_in addr[N];
+	int socket[N];
+	int connection[N]; // for accepting connections (server)
 } p2p_struct;
 
-int accept_p2p(p2p_struct *conn, short int port); // listens/accepts incoming connections
-int connect_p2p(p2p_struct *session, short int port); // searches for connections to create
+int accept_p2p(p2p_struct *conn, short int port, unsigned short n); // listens/accepts incoming connections
+int connect_p2p(p2p_struct *session, short int port, unsigned short n); // searches for connections to create
+
+p2p_struct *init_p2p();
 
 void close_p2p(p2p_struct *session); // deallocates memory/closes sockets
 
+void *listen_p2p(void *arg); // constantly listens for incoming connections
 void *recieve_data(void *arg); // send data to connection
 void *send_data(void *arg); // recieve data from connection
 
