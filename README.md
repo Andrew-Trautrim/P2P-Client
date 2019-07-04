@@ -21,17 +21,26 @@ Options:
 Program execution:  
 listening for incoming connections,
 <pre>
-root@linux:~/P2P-Client/bin# ./session -l -p 8080
+root@linux:~/P2P-Client/bin# ./session -l -p 18 -t 8080
 Establishing server side connection...connected
+Sending local information
 Establishing client side connection...connected
-> Hello, World!
-> 
+Session (type 'X' to exit): 
+What makes you think she's a witch?
+[*] She turned me into a newt.
+A newt?
+[*] ...I got better.
+X
 </pre>
 connect to target address,
 <pre>
-root@linux:~/P2P-Client/bin# ./session -a 127.0.0.1 -p 8080
+root@linux:~/P2P-Client/bin# ./session -a 127.0.0.1 -p 8080 -t 18
 Establishing client side connection...connected
+Reading incoming data...recieved
 Establishing server side connection...connected
-[*] Hello, World!
-> 
+Session (type 'X' to exit): 
+[*] What makes you think she's a witch?
+She turned me into a newt.
+[*] A newt?
+...I got better.
 </pre>
