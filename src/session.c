@@ -1,20 +1,16 @@
 #include "p2p.h"
 
-void print_usage();
+void print_usage(); // displays usage options
 
 int main(int argc, char **argv) {
 
-	static char *options = "a:hlp:t:";
+	static char *options = "a:hln:p:t:";
 
 	int opt, nbytes;
-	int listen = 0;
-	int connect = 0;
-	int target_port = 8080;
-	int local_port = 8080;
+	int nconn = 2; // default number of connections is 2
+	int local_port = 18, target_port = 18; // default port is 18
+	int connect = 0, listen = 0;
 	char *addr = NULL;
-	p2p_header *header;
-	p2p_struct *client;
-	p2p_struct *server;
 
 	// command line argument(s)
 	while((opt = getopt(argc, argv, options)) != -1) {
@@ -28,6 +24,9 @@ int main(int argc, char **argv) {
 				return -1;
 			case 'l':
 				listen = 1;
+				break;
+			case 'n':
+				nconn = atoi(optarg);
 				break;
 			case 'p':
 				local_port = atoi(optarg);
@@ -50,94 +49,49 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	// creating connection
-	header = (p2p_header*)calloc(1, sizeof(p2p_header));
+	p2p_struct *client;
+	p2p_struct *server[nconn];
+
+	// multithreading
+	// listening on multiple ports simultaneously
+	// max of N connections
+	for (int i = 0; i < nconn; ++i)
+		server[i] = init_p2p(local_port + i);
+	pthread_t listening[nconn];
 	if (listen) {
-
-		server = init_p2p();
-
-		if (accept_p2p(server, local_port, server->nconn) < 0) {
-			close_p2p(server);
-			free(header);
-			return -1;
+		for (int i = 0; i < nconn; ++i) {
+			fprintf(stderr, "listening on port %d\n", local_port + i);
+			pthread_create(&listening[i], NULL, accept_p2p, server[i]);
 		}
-		
-		// read incoming connection data to establish client side connection
-		fprintf(stderr, "Reading incoming data...");
-		if (nbytes = read(server->connection[server->nconn], header, sizeof(p2p_header)) < 0) {
-			fprintf(stderr, "\nUnable to read incoming data - error %d\n", errno);
-			close_p2p(server);
-			free(header);
-			return -1;
-		}
-		fprintf(stderr, "recieved\n");
-
-		server->nconn++;
-	} 
+	}
 	
+	// connect to specified address
+	// only 1 connection allowed (so far)
+	client = init_p2p(target_port);
 	if (connect) {
 
-		client = init_p2p();
-
-		if (inet_pton(AF_INET, addr, &client->addr[0].sin_addr) <= 0) {
-			fprintf(stderr, "Invalid address - error %d\n", errno);
+		if (inet_pton(AF_INET, addr, &client->addr.sin_addr) <= 0) {
+			fprintf(stderr, "[!] Invalid address - error %d\n", errno);
 			close_p2p(client);
-			free(header);
+			for (int i = 0; i < nconn; ++i)
+				close_p2p(server[i]);
 			return -1;
 		}
 
-		if (connect_p2p(client, target_port, client->nconn) < 0) {
+		if (connect_p2p(client) < 0) {
 			close_p2p(client);
-			free(header);
+			for (int i = 0; i < nconn; ++i)
+				close_p2p(server[i]);
 			return -1;
 		}
-
-		// connection info
-		char host_buff[256];
-		struct hostent *host_entry;
-		int host_name;
-
-		// retrieve host information for header data
-		if (gethostname(host_buff, sizeof(host_buff)) == -1 || (host_entry = gethostbyname(host_buff)) == NULL) {
-			fprintf(stderr, "Unable to retrieve host information - error %d\n", errno);
-			close_p2p(client);
-			free(header);
-			return -1;
-		}
-
-		// set header informaton
-		inet_aton(host_entry->h_addr_list[0], &header->local_addr);
-		header->port = local_port;
-		// send header
-		fprintf(stderr, "Sending local information\n");
-		if (nbytes = send(client->socket[client->nconn], header, sizeof(p2p_header), 0) < 0) {
-			fprintf(stderr, "Unable to send data - error %d\n", errno);
-			close_p2p(client);
-			free(header);
-		}
-
-		client->nconn++;
 	}
 	
 	fprintf(stdout, "Session (type \'X\' to exit): \n");
 
-	// multithreading
-	pthread_t client_send;
-	pthread_t client_recieve;
-	pthread_t server_send;
-	pthread_t server_recieve;
-	if (listen) {
-		pthread_create(&server_send, NULL, send_data, server);
-		pthread_create(&server_recieve, NULL, recieve_data, server);
-	}
-	if (connect) {
-		pthread_create(&client_send, NULL, send_data, client);
-		pthread_create(&client_recieve, NULL, recieve_data, client);
-	}
-
 	close_p2p(client);
-	close_p2p(server);
-	free(header);
+	for (int i = 0; i < nconn; ++i) {
+		close_p2p(server[i]);
+	}
 	return 0;
 }
 
@@ -148,6 +102,7 @@ void print_usage() {
 	fprintf(stdout, "	-a address : connect to target address\n");
 	fprintf(stdout, "	-h	   : display help options\n");
 	fprintf(stdout, "	-l	   : listen for incoming connections\n");
+	fprintf(stdout, "	-n max #   : maximum number of incoming connections\n");
 	fprintf(stdout, "	-p port	   : local port for accepting connections\n");
 	fprintf(stdout, "	-t port    : target port for connecting\n");
 	return;

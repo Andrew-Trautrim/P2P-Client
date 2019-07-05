@@ -1,103 +1,112 @@
 #include "p2p.h"
 
-/* function initiates network by listening for incoming connections (server side) */
-int accept_p2p(p2p_struct *session, short int port, unsigned short n) {
+/* function connects to existing p2p network (client side) */
+int connect_p2p(p2p_struct *client) {
 
-	// creates server side socket
-	if ((session->socket[n] = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "Unable to create server side socket - error %d\n", errno);
-		return session->socket[n];
+	// creates client side socket
+	if ((client->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "[!] Unable to create client side socket - error %d\n", errno);
+		return client->socket;
 	}
 
 	// connection settings
-	session->addr[n].sin_family = AF_INET;
-	session->addr[n].sin_port = htons(port);
-	session->addr[n].sin_addr.s_addr = INADDR_ANY;
+	client->addr.sin_family = AF_INET;
+	client->addr.sin_port = htons(client->port);
+
+	// client side connection
+	int response = -1;
+	for(int i = 0; i < 5 && response == -1; ++i) {
+		response = connect(client->socket, (struct sockaddr*)&(client->addr), sizeof(client->addr));
+		sleep(2);
+	}
+	if (response == -1) {
+		fprintf(stderr, "[!] Unable to connect - error %d\n", errno);
+		return -1;
+	}
+
+	fprintf(stderr, "Connection established\n");
+	return 1;
+}
+
+
+/*  sends user input to all established connections */
+int send_data(p2p_struct *session) {
+	char buffer[1024];
+	int nbytes;
+	do {
+		fgets(buffer, 1024, stdin);
+		buffer[strlen(buffer)-1] = '\0';
+		if (session->socket != 0)
+			nbytes = send(session->socket, buffer, sizeof(buffer), 0);
+		else if (session->connection != 0)
+			nbytes = send(session->connection, buffer, sizeof(buffer), 0);
+	} while (nbytes >= 0 && strcmp("X", buffer) != 0);
+	if (nbytes < 0)
+		fprintf(stderr, "[!] Unable to send data\n");
+	return -1;
+}
+
+/* allocates memory for the session and sets the connection count */
+p2p_struct *init_p2p(unsigned short port) {
+	p2p_struct *session = (p2p_struct*)calloc(1, sizeof(p2p_struct));
+	session->socket = 0, session->connection = 0;
+	session->port = port;
+	return session;
+}
+
+/* function initiates network by listening for incoming connections (server side) */
+void *accept_p2p(void *arg) {
+	p2p_struct *server = (p2p_struct*)arg;
+
+	// creates server side socket
+	if ((server->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "[!] Unable to create server side socket - error %d\n", errno);
+		return NULL;
+	}
+
+	// connection settings
+	server->addr.sin_family = AF_INET;
+	server->addr.sin_port = htons(server->port);
+	server->addr.sin_addr.s_addr = INADDR_ANY;
 
 	// binds socket to port
-	if (bind(session->socket[n], (struct sockaddr*)&(session->addr[n]), sizeof(session->addr[n])) < 0) {
-		fprintf(stderr, "Unable to bind port %d - error %d\n", port, errno);
-		return -1;
+	if (bind(server->socket, (struct sockaddr*)&(server->addr), sizeof(server->addr)) < 0) {
+		fprintf(stderr, "[!] Unable to bind port %d - error %d\n", server->port, errno);
+		return NULL;
 	}
 
 	// listen on socket/port
 	// maximum of 1 pending connection
-	if (listen(session->socket[n], 1) < 0) {
-		fprintf(stderr, "Unable to listen on port %d - error %d\n", port, errno);
-		return -1;
+	if (listen(server->socket, 1) < 0) {
+		fprintf(stderr, "[!] Unable to listen on port %d - error %d\n",server->port, errno);
+		return NULL;
 	}
 
-	fprintf(stderr, "Establishing server side connection...");
-	int addrlen = sizeof(session->addr[n]);
-	if((session->connection[n] = accept(session->socket[n], (struct sockaddr*)&(session->addr[n]), (socklen_t*)&addrlen)) < 0) {
-		fprintf(stderr, "\nConnection failure - error %d\n", errno);
-		return session->connection[n];
+	int addrlen = sizeof(server->addr);
+	if((server->connection = accept(server->socket, (struct sockaddr*)&(server->addr), (socklen_t*)&addrlen)) < 0) {
+		fprintf(stderr, "[!] Connection failure - error %d\n", errno);
+		return NULL;
 	}
-	fprintf(stderr, "connected\n");
-
-	return 1;
-}
-
-/* function connects to existing p2p network (client side) */
-int connect_p2p(p2p_struct *session, short int port, unsigned short n) {
-
-	// creates client side socket
-	if ((session->socket[n] = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "Unable to create client side socket - error %d\n", errno);
-		return session->socket[n];
-	}
-
-	// connection settings
-	session->addr[n].sin_family = AF_INET;
-	session->addr[n].sin_port = htons(port);
-
-	// client side connection
-	// continuous connection attempts after 2s delay
-	fprintf(stderr, "Establishing client side connection...");
-	int response = -1;
-	for(int i = 0; i < 5 && response == -1; ++i) {
-		response = connect(session->socket[n], (struct sockaddr*)&(session->addr[n]), sizeof(session->addr[n]));
-		sleep(3);
-	}
-	if (response == -1) {
-		fprintf(stderr, "\nUnable to connect - error %d\n", errno);
-		return -1;
-	}
-	fprintf(stderr, "connected\n");
-
-	return 1;
-}
-
-/* allocates memory for the session and sets the connection count */
-p2p_struct *init_p2p() {
-	p2p_struct *session = (p2p_struct*)calloc(1, sizeof(p2p_struct));
-	session->nconn = 0;
-	return session;
+	
+	fprintf(stderr, "Connection established\n");
+	return NULL;
 }
 
 /* deallocates memory and closes sockets*/
 void close_p2p(p2p_struct *session) {
-	for (int i = 0; i <= session->nconn; ++i) {
-		close(session->socket[i]);
-		close(session->connection[i]);
-	}
+	close(session->socket);
+	close(session->connection);
 	free(session);
 	return;
 }
 
-/* listens for incoming connections */
-void *listen_p2p(void *arg) {
-	return NULL;	
-}
-
-/* reads incoming data from connections */
-void *recieve_data(void *arg) {
-	p2p_struct *session = (p2p_struct*)arg;
+/* reads data from client side connections */
+void *read_client(void *arg) {
+	p2p_struct *server = (p2p_struct*)arg;
 	char buffer[1024];
 	int nbytes;
 	do {
-		for (int i = 0; i < session->nconn; ++i)
-			nbytes = read(session->socket[i], buffer, sizeof(buffer));
+		nbytes = read(server->connection, buffer, sizeof(buffer));
 		if (strcmp("X", buffer) == 0)
 			return NULL;
 		fprintf(stdout, "[*] %s\n", buffer);
@@ -105,16 +114,16 @@ void *recieve_data(void *arg) {
 	return NULL;
 }
 
-/*  sends user input to all established connections */
-void *send_data(void *arg) {
-	p2p_struct *session = (p2p_struct*)arg;
+/* reads data from server side connections */
+void *read_server(void *arg) {
+	p2p_struct *client = (p2p_struct*)arg;
 	char buffer[1024];
 	int nbytes;
 	do {
-		fgets(buffer, 1024, stdin);
-		buffer[strlen(buffer)-1] = '\0';
-		for (int i = 0; i < session->nconn; ++i)
-			nbytes = send(session->socket[i], buffer, sizeof(buffer), 0);
-	} while (nbytes > 0 && strcmp("X", buffer) != 0);
+		nbytes = read(client->socket, buffer, sizeof(buffer));
+		if (strcmp("X", buffer) == 0)
+			return NULL;
+		fprintf(stdout, "[*] %s\n", buffer);
+	} while (nbytes > 0);
 	return NULL;
 }
