@@ -6,8 +6,8 @@ int main(int argc, char **argv) {
 
 	static char *options = "a:hln:p:t:";
 
+	nconn = 2;
 	int opt, nbytes;
-	int nconn = 2; // default number of connections is 2
 	int local_port = 18, target_port = 18; // default port is 18
 	int connect = 0, listen = 0;
 	char *addr = NULL;
@@ -52,15 +52,14 @@ int main(int argc, char **argv) {
 	p2p_struct *client;
 	p2p_struct *server[nconn];
 
-	// multithreading
-	// listening on multiple ports simultaneously
+	// multithreading, listening on multiple ports simultaneously
 	// max of N connections
 	for (int i = 0; i < nconn; ++i)
 		server[i] = init_p2p(local_port + i);
 	pthread_t listening[nconn];
 	if (listen) {
 		for (int i = 0; i < nconn; ++i) {
-			fprintf(stderr, "listening on port %d\n", local_port + i);
+			fprintf(stderr, "Listening on port %d\n", local_port + i);
 			pthread_create(&listening[i], NULL, accept_p2p, server[i]);
 		}
 	}
@@ -84,9 +83,19 @@ int main(int argc, char **argv) {
 				close_p2p(server[i]);
 			return -1;
 		}
+		strcpy(client->ip, addr);
+		fprintf(stderr, "Connected to %s\n", addr);
 	}
 	
 	fprintf(stdout, "Session (type \'X\' to exit): \n");
+	
+	// input threads
+	pthread_t cread[nconn], sread;
+	pthread_create(&sread, NULL, read_server, client);
+	for (int i = 0; i < nconn; ++i)
+		pthread_create(&cread[i], NULL, read_client, server[i]);
+
+	send_data(server, client);
 
 	close_p2p(client);
 	for (int i = 0; i < nconn; ++i) {

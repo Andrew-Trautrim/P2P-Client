@@ -3,6 +3,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -10,21 +11,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+// max number of connections
+int nconn;
 
 /* structure maintains connection,
  * can act as either client or server */
 typedef struct {
-	char *ip; // connection identification
+	char ip[32]; // connection identification
 	int socket, connection; // sockets for connecting/accepting
 	unsigned short port;
 	struct sockaddr_in addr;
 } p2p_struct;
 
 int connect_p2p(p2p_struct *session); // searches for connections to create
-int send_data(p2p_struct *session);
+int send_data(p2p_struct **session, p2p_struct *client); // sends data to all connections
 
 p2p_struct *init_p2p(unsigned short port); // allocates memory and sets port
 

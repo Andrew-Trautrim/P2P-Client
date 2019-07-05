@@ -21,35 +21,62 @@ int connect_p2p(p2p_struct *client) {
 	}
 	if (response == -1) {
 		fprintf(stderr, "[!] Unable to connect - error %d\n", errno);
-		return -1;
+		return response;
 	}
 
-	fprintf(stderr, "Connection established\n");
+	// local info
+	char host_buffer[256];
+	char *ip;
+	struct hostent *host_entry;
+	int host_name;
+	host_name = gethostname(host_buffer, sizeof(host_buffer));
+	host_entry = gethostbyname(host_buffer);
+	ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
+	send(client->socket, ip, sizeof(ip)+1, 0);
+
 	return 1;
 }
 
+/* sends user input to all established connections */
+int send_data(p2p_struct **server, p2p_struct *client) {
 
-/*  sends user input to all established connections */
-int send_data(p2p_struct *session) {
 	char buffer[1024];
 	int nbytes;
+
 	do {
+		// input
 		fgets(buffer, 1024, stdin);
 		buffer[strlen(buffer)-1] = '\0';
-		if (session->socket != 0)
-			nbytes = send(session->socket, buffer, sizeof(buffer), 0);
-		else if (session->connection != 0)
-			nbytes = send(session->connection, buffer, sizeof(buffer), 0);
-	} while (nbytes >= 0 && strcmp("X", buffer) != 0);
+		
+		// send to server connection(s)
+		for (int i = 0; i < nconn; ++i) {
+			if (server[i]->connection != 0) {
+				nbytes = send(server[i]->connection, buffer, sizeof(buffer), 0);
+				if (nbytes < 0) {
+					fprintf(stderr, "[!] Unable to send data to %s\n", server[i]->ip);
+				}
+			}
+		}
+
+		// send to client connection(s)
+		if (client->socket != 0) {
+			nbytes = send(client->socket, buffer, sizeof(buffer), 0);
+			if (nbytes < 0) {
+				fprintf(stderr, "[!] Unable to send data to %s\n", client->ip);
+			}
+		}
+	} while (strcmp("X", buffer) != 0);
+
 	if (nbytes < 0)
 		fprintf(stderr, "[!] Unable to send data\n");
 	return -1;
 }
 
-/* allocates memory for the session and sets the connection count */
+/* allocates memory for the session and sets the port */
 p2p_struct *init_p2p(unsigned short port) {
 	p2p_struct *session = (p2p_struct*)calloc(1, sizeof(p2p_struct));
-	session->socket = 0, session->connection = 0;
+	session->socket = 0;
+	session->connection = 0;
 	session->port = port;
 	return session;
 }
@@ -87,8 +114,9 @@ void *accept_p2p(void *arg) {
 		fprintf(stderr, "[!] Connection failure - error %d\n", errno);
 		return NULL;
 	}
-	
-	fprintf(stderr, "Connection established\n");
+
+	read(server->connection, server->ip, sizeof(server->ip));
+	fprintf(stderr, "%s connected on port %d\n", server->ip, server->port);
 	return NULL;
 }
 
@@ -107,10 +135,14 @@ void *read_client(void *arg) {
 	int nbytes;
 	do {
 		nbytes = read(server->connection, buffer, sizeof(buffer));
-		if (strcmp("X", buffer) == 0)
+		if (strcmp("X", buffer) == 0) {
+			fprintf(stdout, "[!] %s disconnected\n", server->ip);
 			return NULL;
-		fprintf(stdout, "[*] %s\n", buffer);
+		}
+		fprintf(stdout, "[%s] %s\n", server->ip, buffer);
 	} while (nbytes > 0);
+
+	fprintf(stdout, "[!] %s disconnected\n", server->ip);
 	return NULL;
 }
 
@@ -121,9 +153,13 @@ void *read_server(void *arg) {
 	int nbytes;
 	do {
 		nbytes = read(client->socket, buffer, sizeof(buffer));
-		if (strcmp("X", buffer) == 0)
+		if (strcmp("X", buffer) == 0) {
+			fprintf(stdout, "[!] %s diconnected\n", client->ip);
 			return NULL;
-		fprintf(stdout, "[*] %s\n", buffer);
+		}
+		fprintf(stdout, "[%s] %s\n", client->ip, buffer);
 	} while (nbytes > 0);
+
+	fprintf(stdout, "[!] %s disconnected\n", client->ip);
 	return NULL;
 }
