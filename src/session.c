@@ -56,19 +56,21 @@ int main(int argc, char **argv) {
 	// max of N connections
 	for (int i = 0; i < nconn; ++i)
 		server[i] = init_p2p(local_port + i);
-	pthread_t listening[nconn];
+	pthread_t slisten[nconn];
+	pthread_t sread[nconn];
 	if (listen) {
 		for (int i = 0; i < nconn; ++i) {
 			fprintf(stderr, "Listening on port %d\n", local_port + i);
-			pthread_create(&listening[i], NULL, accept_p2p, server[i]);
+			pthread_create(&slisten[i], NULL, accept_p2p, server[i]);
+			pthread_create(&sread[i], NULL, read_server, server[i]);
 		}
 	}
 	
 	// connect to specified address
 	// only 1 connection allowed (so far)
 	client = init_p2p(target_port);
+	pthread_t cread;
 	if (connect) {
-
 		if (inet_pton(AF_INET, addr, &client->addr.sin_addr) <= 0) {
 			fprintf(stderr, "[!] Invalid address - error %d\n", errno);
 			close_p2p(client);
@@ -85,16 +87,12 @@ int main(int argc, char **argv) {
 		}
 		strcpy(client->ip, addr);
 		fprintf(stderr, "Connected to %s\n", addr);
+		pthread_create(&cread, NULL, read_client, client);
 	}
 	
 	fprintf(stdout, "Session (type \'X\' to exit): \n");
 	
-	// input threads
-	pthread_t cread[nconn], sread;
-	pthread_create(&sread, NULL, read_server, client);
-	for (int i = 0; i < nconn; ++i)
-		pthread_create(&cread[i], NULL, read_client, server[i]);
-
+	// output
 	send_data(server, client);
 
 	close_p2p(client);
