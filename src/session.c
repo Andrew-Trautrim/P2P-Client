@@ -1,5 +1,7 @@
 #include "p2p.h"
+#include "p2p_chat.h"
 
+int get_usage(); // gets program usage from user
 void print_usage(); // displays usage options
 
 int main(int argc, char **argv) {
@@ -54,13 +56,12 @@ int main(int argc, char **argv) {
 
 	// multithreading, listening on multiple ports simultaneously
 	// max of N connections
-	for (int i = 0; i < nconn; ++i)
-		server[i] = init_p2p(local_port + i);
 	pthread_t slisten[nconn];
 	pthread_t sread[nconn];
+	for (int i = 0; i < nconn; ++i)
+		server[i] = init_p2p(local_port + i);
 	if (listen) {
 		for (int i = 0; i < nconn; ++i) {
-			fprintf(stderr, "Listening on port %d\n", local_port + i);
 			pthread_create(&slisten[i], NULL, accept_p2p, server[i]);
 			pthread_create(&sread[i], NULL, read_server, server[i]);
 		}
@@ -87,19 +88,61 @@ int main(int argc, char **argv) {
 		}
 		strcpy(client->ip, addr);
 		fprintf(stderr, "Connected to %s\n", addr);
-		pthread_create(&cread, NULL, read_client, client);
 	}
 	
-	fprintf(stdout, "Session (type \'X\' to exit): \n");
-	
-	// output
-	send_data(server, client);
+	int input = get_usage();
+	// Exit program
+	if (input == 0) {
+		close_p2p(client);
+		for (int i = 0; i < nconn; ++i) {
+			close_p2p(server[i]);
+		}
+		return 0;
+	} 
+	// Chat Room
+	else if (input == 1) {
+		fprintf(stdout, "Chat Room, type /'X/' to exit:");
+		if (listen) {
+			// create threads for reading incoming data on the server side
+			for (int i = 0; i < nconn; ++i) 
+				pthread_create(&sread[i], NULL, read_server, server[i]);
+		}
+		if (connect) {
+			// thread for reading incoming data on client side
+			pthread_create(&cread, NULL, read_client, client);
+		}
+		// sends data to all connections
+		send_data(server, client);
+	} 
+	// TODO: File Transfer
+	else if (input == 2) {
+		
+	} 
+	// TODO: Remote CLI
+	else {
+
+	}
 
 	close_p2p(client);
 	for (int i = 0; i < nconn; ++i) {
 		close_p2p(server[i]);
 	}
 	return 0;
+}
+
+/* determines program usage */
+int get_usage() {
+	fprintf(stdout, "[0] Exit\n");
+	fprintf(stdout, "[1] Chat Room\n");
+	fprintf(stdout, "[2] File Transfer\n");
+	fprintf(stdout, "[3] Remote CLI\n");
+
+	int input;
+	do {
+		fprintf(stdout, "> ");
+		fscanf(stdin, "%d", &input);
+	} while (input != 0 && input != 1 && input != 2 && input != 3);
+	return input;
 }
 
 /* prints help message for proper usage */
