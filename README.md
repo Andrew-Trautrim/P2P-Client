@@ -5,42 +5,46 @@ A P2P client works by created a connection over the internet directly from compu
 
 Command line usage:
 <pre>
-root@linux:~/P2P-Client/bin# ./session 
-usage: ./session &ltoptions&gt
+root@linux:~/P2P-Client# ./bin/session 
+Improper usage, use '-l' and/or '-a' to connect
 type '-h' for help
 root@linux:~/P2P-Client/bin# ./session -h
 usage: ./session &ltoptions&gt
 
-Options:
-	-a address : target address
+options:
+	-a address : connect to target address
 	-h	   : display help options
 	-l	   : listen for incoming connections
-	-p port	   : port
+	-n max #   : maximum number of incoming connections
+	-p port	   : local port for accepting connections
+	-t port    : target port for connecting
 </pre>
 
 Program execution:  
 listening for incoming connections,
 <pre>
-root@linux:~/P2P-Client/bin# ./session -l -p 18 -t 8080
-Establishing server side connection...connected
-Sending local information
-Establishing client side connection...connected
+root@linux:~/P2P-Client/bin# ./session -l -n 5 -p 18
+Listening on port 18
+Listening on port 19
+Listening on port 20
+Listening on port 21
+Listening on port 22
 Session (type 'X' to exit): 
+78.69.87.84 connected on port 20
 What makes you think she's a witch?
-[*] She turned me into a newt.
+[78.69.87.84] She turned me into a newt.
 A newt?
-[*] ...I got better.
-X
+[78.69.87.84] ...I got better.
+[!] 78.69.87.84 disconnected
 </pre>
 connect to target address,
 <pre>
-root@linux:~/P2P-Client/bin# ./session -a 127.0.0.1 -p 8080 -t 18
-Establishing client side connection...connected
-Reading incoming data...recieved
-Establishing server side connection...connected
+root@linux:~/P2P-Client/bin# ./session -a 10.0.58.1 -t 20
+Connected to 87.73.83.69
 Session (type 'X' to exit): 
-[*] What makes you think she's a witch?
+[87.73.83.69] What makes you think she's a witch?
 She turned me into a newt.
-[*] A newt?
+[87.73.83.69] A newt?
 ...I got better.
+X
 </pre>
