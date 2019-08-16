@@ -49,10 +49,15 @@ p2p_struct *init_p2p(unsigned short port) {
 }
 
 /* deallocates memory and closes sockets*/
-void close_p2p(p2p_struct *session) {
-	close(session->socket);
-	close(session->connection);
-	free(session);
+void close_p2p(p2p_struct **server, p2p_struct *client) {
+	for (int i = 0; i < nconn; ++i) {
+		close(server[i]->socket);
+		close(server[i]->connection);
+		free(server[i]);
+	}
+	close(client->socket);
+	close(client->connection);
+	free(client);
 	return;
 }
 

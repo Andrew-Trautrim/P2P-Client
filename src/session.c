@@ -63,24 +63,21 @@ int main(int argc, char **argv) {
 		server[i] = init_p2p(local_port + i);
 
 	// multithreading, listening on multiple ports simultaneously
-	pthread_t manage;
+	pthread_t slisten[nconn];
 	if (listen) 
-		pthread_create(&manage, NULL, manage_server, server);
+		for (int i = 0; i < nconn; ++i)
+			pthread_create(&slisten[i], NULL, accept_p2p, server[i]);
 	
 	// connect to specified address
 	if (connect) {
 		if (inet_pton(AF_INET, addr, &client->addr.sin_addr) <= 0) {
 			fprintf(stderr, "[!] Invalid address - error %d\n", errno);
-			close_p2p(client);
-			for (int i = 0; i < nconn; ++i)
-				close_p2p(server[i]);
+			close_p2p(server, client);
 			return -1;
 		}
 
 		if (connect_p2p(client) < 0) {
-			close_p2p(client);
-			for (int i = 0; i < nconn; ++i)
-				close_p2p(server[i]);
+			close_p2p(server, client);
 			return -1;
 		}
 		strcpy(client->ip, addr);
@@ -89,15 +86,20 @@ int main(int argc, char **argv) {
 
 	// Exit program
 	if (input == 0) {
-		close_p2p(client);
-		for (int i = 0; i < nconn; ++i) {
-			close_p2p(server[i]);
-		}
+		close_p2p(server, client);
 		return 0;
 	} 
 	// Chat Room
 	else if (input == 1) {
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
+
+		pthread_t manage, read_client;
+		if (listen)
+			pthread_create(&manage, NULL, manage_server, server);
+
+		if (connect)
+			pthread_create(&read_client, NULL, read_data, client);
+
 		// sends data to all connections
 		send_data(server, client);
 	} 
@@ -110,10 +112,7 @@ int main(int argc, char **argv) {
 
 	}
 
-	close_p2p(client);
-	for (int i = 0; i < nconn; ++i) {
-		close_p2p(server[i]);
-	}
+	close_p2p(server, client);
 	return 0;
 }
 
@@ -157,19 +156,14 @@ void print_usage() {
 void *manage_server(void *arg) {
 
 	p2p_struct **server = (p2p_struct**)arg;
-	pthread_t slisten[nconn];
-	pthread_t sread[nconn];
-
-	// threads for listening on open ports
-	for (int i = 0; i < nconn; ++i) {
-		pthread_create(&slisten[i], NULL, accept_p2p, server[i]);
-	}
+	pthread_t read[nconn];
 
 	while (1) {
 		for (int i = 0; i < nconn; ++i) {
 			// if connection is made, read incoming data
 			if (server[i]->active == 1) {
-				pthread_create(&sread[i], NULL, read_data, server[i]);
+				pthread_create(&read[i], NULL, read_data, server[i]);
+				printf("TEST\n");
 			}
 		}
 	}
