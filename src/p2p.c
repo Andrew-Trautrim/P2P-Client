@@ -24,8 +24,6 @@ int connect_p2p(p2p_struct *client) {
 		return response;
 	}
 
-	client->active = 1;
-
 	// local info
 	char host_buffer[256];
 	char *ip;
@@ -36,6 +34,7 @@ int connect_p2p(p2p_struct *client) {
 	ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
 	send(client->socket, ip, sizeof(ip)+1, 0);
 
+	client->connected = 1;
 	return 1;
 }
 
@@ -43,7 +42,9 @@ int connect_p2p(p2p_struct *client) {
 p2p_struct *init_p2p(unsigned short port) {
 	p2p_struct *session = (p2p_struct*)calloc(1, sizeof(p2p_struct));
 	strcpy(session->ip, "UNKNOWN");
+	session->connection = 0;
 	session->active = 0;
+	session->connected = 0;
 	session->port = port;
 	return session;
 }
@@ -98,9 +99,9 @@ void *accept_p2p(void *arg) {
 	}
 
 	int nbytes;
-	server->active = 1;
 	read(server->connection, server->ip, sizeof(server->ip));
 	fprintf(stderr, "%s connected on port %d\n", server->ip, server->port);
+	server->connected = 1;
 	return NULL;
 }
 

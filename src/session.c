@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
 
 	static char *options = "a:hln:p:t:";
 
-	nconn = 2;
+	nconn = 2; // default number of connections is 2
 	int connect = 0;
 	int listen = 0;
 	int opt, nbytes;
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// program must either listen or connect or both
+	// program must listen and/or connect
 	if (!listen && !connect) {
 		fprintf(stderr, "Improper usage, use \'-l\' and/or \'-a\' to connect\ntype \'-h\' for help\n");
 		return -1;
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 	if (input == 0) {
 		close_p2p(server, client);
 		return 0;
-	} 
+	}
 	// Chat Room
 	else if (input == 1) {
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
 
 		// sends data to all connections
 		send_data(server, client);
-	} 
+	}
 	// TODO: File Transfer
 	else if (input == 2) {
 		
@@ -157,14 +157,21 @@ void *manage_server(void *arg) {
 
 	p2p_struct **server = (p2p_struct**)arg;
 	pthread_t read[nconn];
+	int flag = 1;
 
-	while (1) {
+	while (flag) {
 		for (int i = 0; i < nconn; ++i) {
+			flag = 0;
 			// if connection is made, read incoming data
-			if (server[i]->active == 1) {
+			if (server[i]->connected == 1 && server[i]->active == 0) {
+				server[i]->active = 1;
 				pthread_create(&read[i], NULL, read_data, server[i]);
-				printf("TEST\n");
 			}
+
+			// if atleast one connection is still maintained, continue
+			// exit otherwise
+			if (!(server[i]->connected == 0 && server[i]->active == 1))
+				flag = 1;
 		}
 	}
 	return NULL;

@@ -21,7 +21,7 @@ int nconn;
  * can act as either client or server */
 typedef struct {
 	char ip[32]; // connection identification
-	int active;
+	int active, connected;
 	int socket, connection; // sockets for connecting/accepting
 	unsigned short port;
 	struct sockaddr_in addr;

@@ -13,9 +13,9 @@ int send_data(p2p_struct **server, p2p_struct *client) {
 	
 		// send to server connection(s)
 		for (int i = 0; i < nconn; ++i)
-			if (server[i]->active == 1) 
+			if (server[i]->connected == 1)
 				nbytes = send(server[i]->connection, buffer, sizeof(buffer), 0);
-		if (client->active == 1)
+		if (client->connected == 1) 
 			nbytes = send(client->socket, buffer, sizeof(buffer), 0);
 
 	} while (nbytes >= 0 && strcmp("X", buffer) != 0);
@@ -32,15 +32,21 @@ void *read_data(void *arg) {
 	char buffer[1024];
 	int nbytes;
 	do {
-		nbytes = read(conn->connection, buffer, sizeof(buffer));
+		// reads data as either server or client
+		if(conn->connection == 0) 
+			nbytes = read(conn->socket, buffer, sizeof(buffer));
+		else
+			nbytes = read(conn->connection, buffer, sizeof(buffer));
+
 		if (strcmp("X", buffer) == 0) {
 			fprintf(stdout, "[!] %s disconnected\n", conn->ip);
+			conn->connected = 0;
 			return NULL;
 		}
 		fprintf(stdout, "[%s] %s\n", conn->ip, buffer);
 	} while (nbytes > 0);
 
 	fprintf(stdout, "[!] Unable to read data from %s - disconnected\n", conn->ip);
-	conn->active = 0;
+	conn->connected = 0;
 	return NULL;
 }
