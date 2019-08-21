@@ -1,7 +1,7 @@
 #include "p2p_chat.h"
 
 /* sends user input to all established connections */
-int send_data(p2p_struct **server, p2p_struct *client) {
+int send_data(p2p_struct **session) {
 
 	char buffer[1024];
 	int nbytes;
@@ -13,10 +13,11 @@ int send_data(p2p_struct **server, p2p_struct *client) {
 	
 		// send to server connection(s)
 		for (int i = 0; i < nconn; ++i)
-			if (server[i]->connected == 1)
-				nbytes = send(server[i]->connection, buffer, sizeof(buffer), 0);
-		if (client->connected == 1) 
-			nbytes = send(client->socket, buffer, sizeof(buffer), 0);
+			if (session[i+1]->connected == 1)
+				nbytes = send(session[i+1]->connection, buffer, sizeof(buffer), 0);
+		// send to client conection
+		if (session[0]->connected == 1) 
+			nbytes = send(session[0]->socket, buffer, sizeof(buffer), 0);
 
 	} while (nbytes >= 0 && strcmp("X", buffer) != 0);
 
@@ -24,6 +25,28 @@ int send_data(p2p_struct **server, p2p_struct *client) {
 		fprintf(stderr, "[!] Unable to send data\n");
 	}
 	return 1;
+}
+
+/* broadcasts recieved messages to other connections */
+void *broadcast_data(void *arg) {
+	p2p_struct **session = (p2p_struct**)arg;
+	char msg[MSG_LEN];
+	while (1) {
+		// if a new message is recieved
+		// broadcast it to all connections
+		if (strcmp(msg, recieved_message) != 0) {
+			// copies new message
+			strcpy(msg, recieved_message);
+			// send to server connection(s)
+			for (int i = 0; i < nconn; ++i)
+				if (session[i+1]->connected == 1)
+					send(session[i+1]->connection, msg, sizeof(msg), 0);
+			// send to client conection
+			if (session[0]->connected == 1)
+				send(session[0]->socket, msg, sizeof(msg), 0);
+		}
+	}
+	return NULL;
 }
 
 /* reads data from client/server side connections */
@@ -43,6 +66,7 @@ void *read_data(void *arg) {
 			conn->connected = 0;
 			return NULL;
 		}
+		strcpy(recieved_message, buffer);
 		fprintf(stdout, "[%s] %s\n", conn->ip, buffer);
 	} while (nbytes > 0);
 

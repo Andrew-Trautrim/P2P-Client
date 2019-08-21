@@ -7,11 +7,12 @@ void *manage_server(void *arg); // manages connections in the background
 
 int main(int argc, char **argv) {
 
-	static char *options = "a:hln:p:t:";
+	static char *options = "a:hln:p:t:cfr";
 
 	nconn = 2; // default number of connections is 2
 	int connect = 0;
 	int listen = 0;
+	int use = 0;
 	int opt, nbytes;
 	int local_port = 18, target_port = 18; // default port is 18
 	char *addr = NULL;
@@ -38,6 +39,14 @@ int main(int argc, char **argv) {
 			case 't':
 				target_port = atoi(optarg);
 				break;
+			case 'c':
+				use = 1;
+				break;
+			case 'f':
+				use = 2;
+				break;
+			case 'r':
+				use = 3;
 			case '?':
 				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
 				return -1;
@@ -53,58 +62,57 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	// determine how the program should execute
-	int input = get_usage();
+	if (use == 0) {
+		fprintf(stderr, "Usage not specified, use \'-c\', \'-f\', or \'r\'\ntype \'h\' for help\n");
+		return -1;
+	}
 
 	// initiate connections
-	p2p_struct *client = init_p2p(target_port);
-	p2p_struct *server[nconn];
+	p2p_struct *session[nconn+1];
+	session[0] = init_p2p(target_port);
 	for (int i = 0; i < nconn; ++i)
-		server[i] = init_p2p(local_port + i);
+		session[i+1] = init_p2p(local_port + i);
 
 	// multithreading, listening on multiple ports simultaneously
 	pthread_t slisten[nconn];
 	if (listen) 
 		for (int i = 0; i < nconn; ++i)
-			pthread_create(&slisten[i], NULL, accept_p2p, server[i]);
+			pthread_create(&slisten[i], NULL, accept_p2p, session[i+1]);
 	
 	// connect to specified address
 	if (connect) {
-		if (inet_pton(AF_INET, addr, &client->addr.sin_addr) <= 0) {
+		if (inet_pton(AF_INET, addr, &session[0]->addr.sin_addr) <= 0) {
 			fprintf(stderr, "[!] Invalid address - error %d\n", errno);
-			close_p2p(server, client);
+			close_p2p(session);
 			return -1;
 		}
 
-		if (connect_p2p(client) < 0) {
-			close_p2p(server, client);
+		if (connect_p2p(session[0]) < 0) {
+			close_p2p(session);
 			return -1;
 		}
-		strcpy(client->ip, addr);
+		strcpy(session[0]->ip, addr);
 		fprintf(stderr, "Connected to %s\n", addr);
 	}
 
-	// Exit program
-	if (input == 0) {
-		close_p2p(server, client);
-		return 0;
-	}
 	// Chat Room
-	else if (input == 1) {
+	else if (use == 1) {
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
-		pthread_t manage, read_client;
+		pthread_t broadcast, manage, read_client;
 		if (listen)
-			pthread_create(&manage, NULL, manage_server, server);
+			pthread_create(&manage, NULL, manage_server, session);
 
 		if (connect)
-			pthread_create(&read_client, NULL, read_data, client);
+			pthread_create(&read_client, NULL, read_data, session[0]);
 
+		// broadcasts recieved data to all connections
+		pthread_create(&broadcast, NULL, broadcast_data, session);
 		// sends data to all connections
-		send_data(server, client);
+		send_data(session);
 	}
 	// TODO: File Transfer
-	else if (input == 2) {
+	else if (use == 2) {
 		
 	} 
 	// TODO: Remote CLI
@@ -112,40 +120,24 @@ int main(int argc, char **argv) {
 
 	}
 
-	close_p2p(server, client);
+	close_p2p(session);
 	return 0;
-}
-
-/* determines program usage */
-int get_usage() {
-	fprintf(stdout, "[0] Exit\n");
-	fprintf(stdout, "[1] Chat Room\n");
-	fprintf(stdout, "[2] File Transfer\n");
-	fprintf(stdout, "[3] Remote CLI\n");
-
-	int input;
-	do {
-		fprintf(stdout, "> ");
-		fscanf(stdin, "%d", &input);
-	} while (input != 0 && input != 1 && input != 2 && input != 3);
-	return input;
 }
 
 /* prints help message for proper usage */
 void print_usage() {
 	fprintf(stdout, "usage: ./session <options>\n");
-	fprintf(stdout, "options:\n");
+	fprintf(stdout, "network options:\n");
 	fprintf(stdout, "	-a address : connect to target address\n");
 	fprintf(stdout, "	-h	   : display help options\n");
 	fprintf(stdout, "	-l	   : listen for incoming connections\n");
 	fprintf(stdout, "	-n max #   : maximum number of incoming connections\n");
 	fprintf(stdout, "	-p port	   : local port for accepting connections\n");
 	fprintf(stdout, "	-t port    : target port for connecting\n");
-	/*
+	fprintf(stdout, "\ninterface options:\n");
 	fprintf(stdout, "	-c	   : chat room\n");
 	fprintf(stdout, "	-f	   : file transfer\n");
 	fprintf(stdout, "	-r	   : remote command line interface\n");
-	 */
 	return;
 }
 
@@ -155,7 +147,7 @@ void print_usage() {
  */
 void *manage_server(void *arg) {
 
-	p2p_struct **server = (p2p_struct**)arg;
+	p2p_struct **session = (p2p_struct**)arg;
 	pthread_t read[nconn];
 	int flag = 1;
 
@@ -163,14 +155,14 @@ void *manage_server(void *arg) {
 		for (int i = 0; i < nconn; ++i) {
 			flag = 0;
 			// if connection is made, read incoming data
-			if (server[i]->connected == 1 && server[i]->active == 0) {
-				server[i]->active = 1;
-				pthread_create(&read[i], NULL, read_data, server[i]);
+			if (session[i+1]->connected == 1 && session[i+1]->active == 0) {
+				session[i+1]->active = 1;
+				pthread_create(&read[i], NULL, read_data, session[i+1]);
 			}
 
 			// if atleast one connection is still maintained, continue
 			// exit otherwise
-			if (!(server[i]->connected == 0 && server[i]->active == 1))
+			if (!(session[i+1]->connected == 0 && session[i+1]->active == 1))
 				flag = 1;
 		}
 	}
