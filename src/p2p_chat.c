@@ -1,5 +1,12 @@
 #include "p2p_chat.h"
 
+/* returns 1 if all message details are the same, 0 otherwise */
+int compare(message msg1, message msg2) {
+	if (strcmp(msg1.sender, msg2.sender) == 0 && strcmp(msg1.origin, msg2.origin) == 0 && strcmp(msg1.msg, msg2.msg) == 0)
+		return 1;
+	return 0;
+}
+
 /* sends user input to all established connections */
 int send_data(p2p_struct **session) {
 
@@ -30,20 +37,22 @@ int send_data(p2p_struct **session) {
 /* broadcasts recieved messages to other connections */
 void *broadcast_data(void *arg) {
 	p2p_struct **session = (p2p_struct**)arg;
-	char msg[MSG_LEN];
+	message temp;
 	while (1) {
 		// if a new message is recieved
 		// broadcast it to all connections
-		if (strcmp(msg, recieved_message) != 0) {
+		if (compare(temp, recieved_message)) {
 			// copies new message
-			strcpy(msg, recieved_message);
+			strcpy(temp.sender, recieved_message.sender);
+			strcpy(temp.origin, recieved_message.origin);
+			strcpy(temp.msg, recieved_message.msg);
 			// send to server connection(s)
 			for (int i = 0; i < nconn; ++i)
 				if (session[i+1]->connected == 1)
-					send(session[i+1]->connection, msg, sizeof(msg), 0);
+					send(session[i+1]->connection, &temp, sizeof(temp), 0);
 			// send to client conection
 			if (session[0]->connected == 1)
-				send(session[0]->socket, msg, sizeof(msg), 0);
+				send(session[0]->socket, &temp, sizeof(temp), 0);
 		}
 	}
 	return NULL;
@@ -66,7 +75,7 @@ void *read_data(void *arg) {
 			conn->connected = 0;
 			return NULL;
 		}
-		strcpy(recieved_message, buffer);
+		strcpy(recieved_message.msg, buffer);
 		fprintf(stdout, "[%s] %s\n", conn->ip, buffer);
 	} while (nbytes > 0);
 

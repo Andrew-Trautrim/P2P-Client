@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
 				break;
 			case 'h':
 				print_usage();
-				return -1;
+				return 1;
 			case 'l':
 				listen = 1;
 				break;
@@ -47,6 +47,7 @@ int main(int argc, char **argv) {
 				break;
 			case 'r':
 				use = 3;
+				break;
 			case '?':
 				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
 				return -1;
@@ -56,12 +57,12 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// program must listen and/or connect
+	// network options not specified, program must listen and/or connect
 	if (!listen && !connect) {
 		fprintf(stderr, "Improper usage, use \'-l\' and/or \'-a\' to connect\ntype \'-h\' for help\n");
 		return -1;
 	}
-
+	// usage not specified, program must either deploy chatroom, file transfer, or remote command line
 	if (use == 0) {
 		fprintf(stderr, "Usage not specified, use \'-c\', \'-f\', or \'r\'\ntype \'h\' for help\n");
 		return -1;
@@ -113,11 +114,11 @@ int main(int argc, char **argv) {
 	}
 	// TODO: File Transfer
 	else if (use == 2) {
-		
-	} 
+		fprintf(stdout, "Usage not available: file transfer\n");
+	}
 	// TODO: Remote CLI
 	else {
-
+		fprintf(stdout, "Usage not available: remote command line\n");
 	}
 
 	close_p2p(session);
@@ -142,7 +143,7 @@ void print_usage() {
 }
 
 /*
- * manages all server side connections connections
+ * manages all server side connections
  * creates a thread to read incoming data if a connections is made
  */
 void *manage_server(void *arg) {

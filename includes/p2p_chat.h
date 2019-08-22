@@ -4,8 +4,16 @@
 #include "p2p.h"
 
 #define MSG_LEN 64 // max length of recieved message
-char recieved_message[MSG_LEN];
 
+typedef struct {
+    char sender[32];
+    char origin[32];
+    char msg[MSG_LEN];
+} message;
+
+message recieved_message;
+
+int compare(message msg1, message msg2); // compares two messages
 int send_data(p2p_struct **session); // sends data to all connections
 
 void *broadcast_data(void *arg); // broadcasts recieved message to all connections
