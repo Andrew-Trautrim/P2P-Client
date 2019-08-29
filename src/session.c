@@ -1,7 +1,7 @@
 #include "p2p.h"
 #include "p2p_chat.h"
 
-int get_usage(); // gets program usage from user
+void get_ports(int *ports, char *port_list); // interperets list of ports from command line 
 void print_usage(); // displays usage options
 void *manage_server(void *arg); // manages connections in the background
 
@@ -14,8 +14,9 @@ int main(int argc, char **argv) {
 	int listen = 0;
 	int use = 0;
 	int opt, nbytes;
-	int local_port = 18, target_port = 18; // default port is 18
+	int target_port = 18; // default port is 18
 	char *addr = NULL;
+	char *local_ports = NULL;
 
 	// command line argument(s)
 	while((opt = getopt(argc, argv, options)) != -1) {
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
 				nconn = atoi(optarg);
 				break;
 			case 'p':
-				local_port = atoi(optarg);
+				local_ports = optarg;
 				break;
 			case 't':
 				target_port = atoi(optarg);
@@ -56,6 +57,13 @@ int main(int argc, char **argv) {
 				return -1;
 		}
 	}
+
+	int ports[nconn];
+	if (local_ports == NULL) // default setting
+		for(int i = 0; i < nconn; ++i)
+			ports[i] = 18 + i;
+	else // ports are specified
+		get_ports(ports, local_ports);
 
 	// network options not specified, program must listen and/or connect
 	if (!listen && !connect) {
@@ -80,7 +88,7 @@ int main(int argc, char **argv) {
 	p2p_struct *session[nconn+1];
 	session[0] = init_p2p(target_port);
 	for (int i = 0; i < nconn; ++i)
-		session[i+1] = init_p2p(local_port + i);
+		session[i+1] = init_p2p(ports[i]);
 
 	// multithreading, listening on multiple ports simultaneously
 	pthread_t slisten[nconn];
@@ -101,7 +109,6 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 		strcpy(session[0]->ip, addr);
-		printf("TEST: %s - %s\n", addr, session[0]->ip);
 		fprintf(stderr, "Connected to %s\n", addr);
 	}
 
@@ -134,6 +141,29 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
+void get_ports(int *ports, char *local_ports) {
+	int len = strlen(local_ports);
+	int j = 0;
+	int start = 0;
+	int end;
+	for(int i = 0; i < len; ++i) {
+		if (local_ports[i] == ',' || i+1 == len) {
+			end = (local_ports[i] == ',') ? i : i+1;
+			char temp[end-start+1];
+			int c = 0;
+			while (start < end) {
+				temp[c++] = local_ports[start++];
+			}
+			temp[c] = '\0';
+			start++;
+			ports[j++] = atoi(temp);
+		} 
+		if (j >= nconn) // # of ports cant exceed # of connections
+			return;
+	}
+	return;
+}
+
 /* prints help message for proper usage */
 void print_usage() {
 	fprintf(stdout, "usage: ./session <options>\n");
@@ -142,7 +172,7 @@ void print_usage() {
 	fprintf(stdout, "	-h	   : display help options\n");
 	fprintf(stdout, "	-l	   : listen for incoming connections\n");
 	fprintf(stdout, "	-n max #   : maximum number of incoming connections\n");
-	fprintf(stdout, "	-p port	   : local port for accepting connections\n");
+	fprintf(stdout, "	-p port-1,port-2,...,port-n	   : local ports for accepting connections\n");
 	fprintf(stdout, "	-t port    : target port for connecting\n");
 	fprintf(stdout, "\ninterface options:\n");
 	fprintf(stdout, "	-c	   : chat room\n");
