@@ -24,16 +24,14 @@ int connect_p2p(p2p_struct *client) {
 		return response;
 	}
 
-	// local info
-	char host_buffer[256];
-	char *ip;
-	struct hostent *host_entry;
-	int host_name;
-	host_name = gethostname(host_buffer, sizeof(host_buffer));
-	host_entry = gethostbyname(host_buffer);
-	ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
-	send(client->socket, ip, sizeof(ip)+1, 0);
-
+/*
+	char buffer[32];
+	strcpy(buffer, local_ip);
+	if (local_ip == NULL)
+		send(client->socket, "UNKNOWN", sizeof("UNKNOWN"), 0);
+	else
+		send(client->socket, buffer, sizeof(buffer), 0);
+*/
 	client->connected = 1;
 	return 1;
 }
@@ -95,9 +93,8 @@ void *accept_p2p(void *arg) {
 		return NULL;
 	}
 
-	int nbytes;
-	read(server->connection, server->ip, sizeof(server->ip));
-	fprintf(stderr, "%s connected on port %d\n", server->ip, server->port);
+	//read(server->connection, server->ip, sizeof(server->ip));
+	fprintf(stdout, "port %d connected\n", server->port);
 	server->connected = 1;
 	return NULL;
 }

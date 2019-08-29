@@ -14,8 +14,8 @@
 #include <time.h>
 #include <unistd.h>
 
-// max number of connections
-int nconn;
+int nconn; // max number of connections
+char *local_ip; // local ip address
 
 /* structure maintains connection,
  * can act as either client or server */

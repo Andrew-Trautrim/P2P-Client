@@ -68,6 +68,14 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
+	// set local information
+	char host_buffer[256];
+	struct hostent *host_entry;
+	int host_name;
+	host_name = gethostname(host_buffer, sizeof(host_buffer));
+	host_entry = gethostbyname(host_buffer);
+	local_ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
+
 	// initiate connections
 	p2p_struct *session[nconn+1];
 	session[0] = init_p2p(target_port);
@@ -93,11 +101,12 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 		strcpy(session[0]->ip, addr);
+		printf("TEST: %s - %s\n", addr, session[0]->ip);
 		fprintf(stderr, "Connected to %s\n", addr);
 	}
 
 	// Chat Room
-	else if (use == 1) {
+	if (use == 1) {
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
 		pthread_t broadcast, manage, read_client;
