@@ -1,29 +1,32 @@
 #include "p2p.h"
 #include "p2p_chat.h"
 
-void get_ports(int *ports, char *port_list); // interperets list of ports from command line 
+char **get_addrs(char *addr_list, int *n); // interprets list of addresses from command line
+int *get_ports(char *port_list, int *n); // interprets list of ports from command line
 void print_usage(); // displays usage options
+void *manage_client(void *arg); // manages client side connections
 void *manage_server(void *arg); // manages connections in the background
 
 int main(int argc, char **argv) {
 
 	static char *options = "a:hln:p:t:cfr";
 
-	nconn = 2; // default number of connections is 2
+	sconn = 0; // default number of connections is 2
+	cconn = 0;
 	int connect = 0;
 	int listen = 0;
 	int use = 0;
 	int opt, nbytes;
-	int target_port = 18; // default port is 18
-	char *addr = NULL;
-	char *local_ports = NULL;
+	char *addr_list = NULL;
+	char *local_port_list = NULL;
+	char *target_port_list = NULL;
 
 	// command line argument(s)
 	while((opt = getopt(argc, argv, options)) != -1) {
 		switch (opt) {
 			case 'a':
 				connect = 1;
-				addr = optarg;
+				addr_list = optarg;
 				break;
 			case 'h':
 				print_usage();
@@ -32,13 +35,14 @@ int main(int argc, char **argv) {
 				listen = 1;
 				break;
 			case 'n':
-				nconn = atoi(optarg);
+				sconn = atoi(optarg);
+				cconn = sconn;
 				break;
 			case 'p':
-				local_ports = optarg;
+				local_port_list = optarg;
 				break;
 			case 't':
-				target_port = atoi(optarg);
+				target_port_list = optarg;
 				break;
 			case 'c':
 				use = 1;
@@ -58,12 +62,26 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	int ports[nconn];
-	if (local_ports == NULL) // default setting
-		for(int i = 0; i < nconn; ++i)
-			ports[i] = 18 + i;
+	int *local_ports;
+	int *target_ports;
+
+	// local ports
+	if (local_port_list == NULL) { // default setting
+		local_ports = calloc(sconn, sizeof(int));
+		for(int i = 0; i < sconn; ++i)
+			local_ports[i] = 18 + i;
+	}
 	else // ports are specified
-		get_ports(ports, local_ports);
+		local_ports = get_ports(local_port_list, &sconn);
+
+	// target ports
+	if (target_port_list == NULL) { // default setting
+		target_ports = calloc(cconn, sizeof(int));
+		for(int i = 0; i < cconn; ++i)
+			local_ports[i] = 18 + i;
+	}
+	else // ports are specified
+		target_ports = get_ports(target_port_list, &cconn);
 
 	// network options not specified, program must listen and/or connect
 	if (!listen && !connect) {
@@ -84,32 +102,41 @@ int main(int argc, char **argv) {
 	host_entry = gethostbyname(host_buffer);
 	local_ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
 
-	// initiate connections
-	p2p_struct *session[nconn+1];
-	session[0] = init_p2p(target_port);
-	for (int i = 0; i < nconn; ++i)
-		session[i+1] = init_p2p(ports[i]);
+	// initiate structure
+	p2p_struct *session[cconn+sconn];
+	for (int i = 0; i < cconn; ++i)
+		session[i] = init_p2p(target_ports[i]);
+	for (int i = 0; i < sconn; ++i)
+		session[i+cconn] = init_p2p(local_ports[i]);
 
-	// multithreading, listening on multiple ports simultaneously
-	pthread_t slisten[nconn];
+	// multithreading, listening on multiple ports
+	pthread_t slisten[sconn];
 	if (listen) 
-		for (int i = 0; i < nconn; ++i)
-			pthread_create(&slisten[i], NULL, accept_p2p, session[i+1]);
+		for (int i = 0; i < sconn; ++i)
+			pthread_create(&slisten[i], NULL, accept_p2p, session[i+cconn]);
 	
-	// connect to specified address
+	// multithreading, connecting to multiple addresses
+	pthread_t cconnect[cconn];
+	char **addrs;
 	if (connect) {
-		if (inet_pton(AF_INET, addr, &session[0]->addr.sin_addr) <= 0) {
-			fprintf(stderr, "[!] Invalid address - error %d\n", errno);
-			close_p2p(session);
+		int n;
+		addrs = get_addrs(addr_list, &n);
+		if (n != cconn) {
+			fprintf(stderr, "Address list doesn't match ports\ntype \'h\' for help\n");
+			for(int i = 0; i < n; ++i) {
+				free(addrs[i]);
+			}
+			free(addrs);
 			return -1;
 		}
-
-		if (connect_p2p(session[0]) < 0) {
-			close_p2p(session);
-			return -1;
+		for (int i = 0; i < cconn; ++i) {
+			strcpy(session[i]->ip, addrs[i]);
+			if (inet_pton(AF_INET, session[i]->ip, &session[i]->addr.sin_addr) <= 0) {
+				fprintf(stderr, "[!] Invalid address %s - error %d\n", session[i]->ip, errno);
+			} else {
+				pthread_create(&cconnect[i], NULL, connect_p2p, session[i]);
+			}
 		}
-		strcpy(session[0]->ip, addr);
-		fprintf(stderr, "Connected to %s\n", addr);
 	}
 
 	// Chat Room
@@ -137,31 +164,67 @@ int main(int argc, char **argv) {
 		fprintf(stdout, "Usage not available: remote command line\n");
 	}
 
+	
+	free(local_ports);
+	free(target_ports);
+	for(int i = 0; i < cconn; ++i)
+		free(addrs[i]);
+	free(addrs);
 	close_p2p(session);
 	return 0;
 }
 
-void get_ports(int *ports, char *local_ports) {
-	int len = strlen(local_ports);
-	int j = 0;
-	int start = 0;
+char **get_addrs(char *addr_list, int *n) {
+	int len = strlen(addr_list);
+	int j = 0, start = 0, buffer = 2;
 	int end;
+	char **addrs = calloc(buffer, sizeof(char*));
 	for(int i = 0; i < len; ++i) {
-		if (local_ports[i] == ',' || i+1 == len) {
-			end = (local_ports[i] == ',') ? i : i+1;
+		if (j >= buffer) { // allocates size accordingly
+			addrs = realloc(addrs, buffer * sizeof(char*));
+			buffer += 2;
+		}
+		if (addr_list[i] == ',' || i+1 == len) {
+			end = (addr_list[i] == ',') ? i : i+1;
 			char temp[end-start+1];
 			int c = 0;
 			while (start < end) {
-				temp[c++] = local_ports[start++];
+				temp[c++] = addr_list[start++];
+			}
+			temp[c] = '\0';
+			start++;
+			addrs[j] = calloc(strlen(temp), sizeof(char));
+			strcpy(addrs[j++], temp);
+		}
+	}
+	(*n) = j;
+	return addrs;
+}
+
+int *get_ports(char *port_list, int *n) {
+	int len = strlen(port_list);
+	int j = 0, start = 0, buffer = 2;
+	int end;
+	int *ports = calloc(buffer, sizeof(int));
+	for(int i = 0; i < len; ++i) {
+		if (j >= buffer) { // allocates size accordingly
+			ports = realloc(ports, buffer * sizeof(int));
+			buffer += 2;
+		}
+		if (port_list[i] == ',' || i+1 == len) {
+			end = (port_list[i] == ',') ? i : i+1;
+			char temp[end-start+1];
+			int c = 0;
+			while (start < end) {
+				temp[c++] = port_list[start++];
 			}
 			temp[c] = '\0';
 			start++;
 			ports[j++] = atoi(temp);
-		} 
-		if (j >= nconn) // # of ports cant exceed # of connections
-			return;
+		}
 	}
-	return;
+	(*n) = j;
+	return ports;
 }
 
 /* prints help message for proper usage */
@@ -188,16 +251,16 @@ void print_usage() {
 void *manage_server(void *arg) {
 
 	p2p_struct **session = (p2p_struct**)arg;
-	pthread_t read[nconn];
+	pthread_t read[sconn];
 	int flag = 1;
 
 	while (flag) {
-		for (int i = 0; i < nconn; ++i) {
+		for (int i = 0; i < sconn; ++i) {
 			flag = 0;
 			// if connection is made, read incoming data
-			if (session[i+1]->connected == 1 && session[i+1]->active == 0) {
-				session[i+1]->active = 1;
-				pthread_create(&read[i], NULL, read_data, session[i+1]);
+			if (session[i+cconn]->connected == 1 && session[i+cconn]->active == 0) {
+				session[i+cconn]->active = 1;
+				pthread_create(&read[i], NULL, read_data, session[i+cconn]);
 			}
 
 			// if atleast one connection is still maintained, continue

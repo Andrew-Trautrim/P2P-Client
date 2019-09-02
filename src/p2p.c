@@ -1,12 +1,14 @@
 #include "p2p.h"
 
-/* function connects to existing p2p network (client side) */
-int connect_p2p(p2p_struct *client) {
+/* function connects to an existing server node in p2p network (client side) */
+void *connect_p2p(void *arg) {
+
+	p2p_struct *client = (p2p_struct*)arg;
 
 	// creates client side socket
 	if ((client->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "[!] Unable to create client side socket - error %d\n", errno);
-		return client->socket;
+		fprintf(stderr, "[!] Unable to create client side socket for %s - error %d\n", client->ip, errno);
+		return NULL;
 	}
 
 	// connection settings
@@ -17,23 +19,18 @@ int connect_p2p(p2p_struct *client) {
 	int response = -1;
 	for(int i = 0; i < 5 && response == -1; ++i) {
 		response = connect(client->socket, (struct sockaddr*)&(client->addr), sizeof(client->addr));
+		if (response != -1)
+			break;
 		sleep(2);
 	}
 	if (response == -1) {
-		fprintf(stderr, "[!] Unable to connect - error %d\n", errno);
-		return response;
+		fprintf(stderr, "[!] Unable to connect to %s - error %d\n", client->ip, errno);
+		return NULL;
 	}
 
-/*
-	char buffer[32];
-	strcpy(buffer, local_ip);
-	if (local_ip == NULL)
-		send(client->socket, "UNKNOWN", sizeof("UNKNOWN"), 0);
-	else
-		send(client->socket, buffer, sizeof(buffer), 0);
-*/
 	client->connected = 1;
-	return 1;
+	fprintf(stdout, "Connected to %s on port %d\n", client->ip, client->port);
+	return NULL;
 }
 
 /* allocates memory for the session and sets the port */
@@ -49,7 +46,7 @@ p2p_struct *init_p2p(unsigned short port) {
 
 /* deallocates memory and closes sockets*/
 void close_p2p(p2p_struct **session) {
-	for (int i = 0; i < nconn+1; ++i) {
+	for (int i = 0, n = cconn+sconn; i < n; ++i) {
 		close(session[i]->socket);
 		close(session[i]->connection);
 		free(session[i]);
