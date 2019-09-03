@@ -4,8 +4,7 @@
 char **get_addrs(char *addr_list, int *n); // interprets list of addresses from command line
 int *get_ports(char *port_list, int *n); // interprets list of ports from command line
 void print_usage(); // displays usage options
-void *manage_client(void *arg); // manages client side connections
-void *manage_server(void *arg); // manages connections in the background
+void *manage_chat(void *arg); // manages client side connections
 
 int main(int argc, char **argv) {
 
@@ -108,12 +107,6 @@ int main(int argc, char **argv) {
 		session[i] = init_p2p(target_ports[i]);
 	for (int i = 0; i < sconn; ++i)
 		session[i+cconn] = init_p2p(local_ports[i]);
-
-	// multithreading, listening on multiple ports
-	pthread_t slisten[sconn];
-	if (listen) 
-		for (int i = 0; i < sconn; ++i)
-			pthread_create(&slisten[i], NULL, accept_p2p, session[i+cconn]);
 	
 	// multithreading, connecting to multiple addresses
 	pthread_t cconnect[cconn];
@@ -122,7 +115,7 @@ int main(int argc, char **argv) {
 		int n;
 		addrs = get_addrs(addr_list, &n);
 		if (n != cconn) {
-			fprintf(stderr, "Address list doesn't match ports\ntype \'h\' for help\n");
+			fprintf(stderr, "Address list doesn't match ports\ntype \'-h\' for help\n");
 			for(int i = 0; i < n; ++i) {
 				free(addrs[i]);
 			}
@@ -139,17 +132,24 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// multithreading, listening on multiple ports
+	pthread_t slisten[sconn];
+	if (listen) {
+		for (int i = 0; i < sconn; ++i) {
+			pthread_create(&slisten[i], NULL, accept_p2p, session[i+cconn]);
+			sleep(0.1);
+		}
+	}
+
 	// Chat Room
 	if (use == 1) {
 
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
-		pthread_t broadcast, manage[2], read_client;
-		if (listen)
-			pthread_create(&manage[0], NULL, manage_server, session);
+		pthread_t broadcast, manage, read_client;
 
-		if (connect)
-			pthread_create(&read_client, NULL, read_data, session[0]);
+		// manages both server and client side connections
+		pthread_create(&manage, NULL, manage_chat, session);
 
 		// broadcasts recieved data to all connections
 		pthread_create(&broadcast, NULL, broadcast_data, session);
@@ -232,43 +232,43 @@ int *get_ports(char *port_list, int *n) {
 
 /* prints help message for proper usage */
 void print_usage() {
-	fprintf(stdout, "usage: ./session <options>\n");
+	fprintf(stdout, "usage: ./session <options>\n\n");
 	fprintf(stdout, "network options:\n");
-	fprintf(stdout, "	-a address : connect to target address\n");
-	fprintf(stdout, "	-h	   : display help options\n");
-	fprintf(stdout, "	-l	   : listen for incoming connections\n");
-	fprintf(stdout, "	-n max #   : maximum number of incoming connections\n");
-	fprintf(stdout, "	-p port-1,port-2,...,port-n	   : local ports for accepting connections\n");
-	fprintf(stdout, "	-t port    : target port for connecting\n");
-	fprintf(stdout, "\ninterface options:\n");
-	fprintf(stdout, "	-c	   : chat room\n");
-	fprintf(stdout, "	-f	   : file transfer\n");
-	fprintf(stdout, "	-r	   : remote command line interface\n");
+	fprintf(stdout, "\t-a a1,a2,...,an : connect to target addresses\n");
+	fprintf(stdout, "\t-h              : display help options\n");
+	fprintf(stdout, "\t-l              : listen for incoming connections\n");
+	fprintf(stdout, "\t-n #            : maximum number of incoming connections\n");
+	fprintf(stdout, "\t-p p1,p2,...,pn : local ports for accepting connections\n");
+	fprintf(stdout, "\t-t p1,p2,...,pn : target ports for connecting\n");
+	fprintf(stdout, "interface options:\n");
+	fprintf(stdout, "\t-c              : chat room\n");
+	fprintf(stdout, "\t-f              : file transfer\n");
+	fprintf(stdout, "\t-r              : remote command line interface\n");
 	return;
 }
 
 /*
- * manages all server side connections
+ * manages both client and server side connections
  * creates a thread to read incoming data if a connections is made
  */
-void *manage_server(void *arg) {
+void *manage_chat(void *arg) {
 
 	p2p_struct **session = (p2p_struct**)arg;
-	pthread_t read[sconn];
+	pthread_t read[cconn+sconn];
 	int flag = 1;
 
 	while (flag) {
-		for (int i = 0; i < sconn; ++i) {
+		for (int i = 0, n = cconn+sconn; i < n; ++i) {
 			flag = 0;
 			// if connection is made, read incoming data
-			if (session[i+cconn]->connected == 1 && session[i+cconn]->active == 0) {
-				session[i+cconn]->active = 1;
-				pthread_create(&read[i], NULL, read_data, session[i+cconn]);
+			if (session[i]->connected == 1 && session[i]->active == 0) {
+				session[i]->active = 1;
+				pthread_create(&read[i], NULL, read_data, session[i]);
 			}
 
 			// if atleast one connection is still maintained, continue
 			// exit otherwise
-			if (!(session[i+cconn]->connected == 0 && session[i+cconn]->active == 1))
+			if (!(session[i]->connected == 0 && session[i]->active == 1))
 				flag = 1;
 		}
 	}
