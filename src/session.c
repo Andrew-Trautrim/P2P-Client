@@ -11,15 +11,12 @@ int main(int argc, char **argv) {
 
 	static char *options = "a:hln:p:t:cfr";
 
-	sconn = 0; // default number of connections is 2
-	cconn = 0;
-	int connect = 0;
-	int listen = 0;
+	sconn = cconn = 0;
+	int connect = 0, listen = 0;
 	int use = 0;
 	int opt, nbytes;
 	char *addr_list = NULL;
-	char *local_port_list = NULL;
-	char *target_port_list = NULL;
+	char *local_port_list = NULL, *target_port_list = NULL;
 
 	// command line argument(s)
 	while((opt = getopt(argc, argv, options)) != -1) {
@@ -35,8 +32,7 @@ int main(int argc, char **argv) {
 				listen = 1;
 				break;
 			case 'n':
-				sconn = atoi(optarg);
-				cconn = sconn;
+				sconn = sconn = atoi(optarg);
 				break;
 			case 'p':
 				local_port_list = optarg;
@@ -62,25 +58,29 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	int *local_ports;
-	int *target_ports;
+	int *local_ports = NULL;
+	int *target_ports = NULL;
 
 	// local ports
-	if (local_port_list == NULL) { // default setting
+	if (local_port_list == NULL && listen) { // default setting
+		if (sconn == 0)
+			sconn = 2; // default # of connections is 2
 		local_ports = calloc(sconn, sizeof(int));
 		for(int i = 0; i < sconn; ++i)
 			local_ports[i] = 18 + i;
 	}
-	else // ports are specified
+	else if (listen) // ports are specified
 		local_ports = get_ports(local_port_list, &sconn);
 
 	// target ports
-	if (target_port_list == NULL) { // default setting
+	if (target_port_list == NULL && connect) { // default setting
+		if (cconn == 0)
+			cconn = 2; // default # of connections is 2
 		target_ports = calloc(cconn, sizeof(int));
 		for(int i = 0; i < cconn; ++i)
 			local_ports[i] = 18 + i;
 	}
-	else // ports are specified
+	else if (connect) // ports are specified
 		target_ports = get_ports(target_port_list, &cconn);
 
 	// network options not specified, program must listen and/or connect
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
 	
 	// multithreading, connecting to multiple addresses
 	pthread_t cconnect[cconn];
-	char **addrs;
+	char **addrs = NULL;
 	if (connect) {
 		int n;
 		addrs = get_addrs(addr_list, &n);
@@ -141,17 +141,19 @@ int main(int argc, char **argv) {
 
 	// Chat Room
 	if (use == 1) {
+
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
-		pthread_t broadcast, manage, read_client;
+		pthread_t broadcast, manage[2], read_client;
 		if (listen)
-			pthread_create(&manage, NULL, manage_server, session);
+			pthread_create(&manage[0], NULL, manage_server, session);
 
 		if (connect)
 			pthread_create(&read_client, NULL, read_data, session[0]);
 
 		// broadcasts recieved data to all connections
 		pthread_create(&broadcast, NULL, broadcast_data, session);
+
 		// sends data to all connections
 		send_data(session);
 	}
@@ -164,12 +166,13 @@ int main(int argc, char **argv) {
 		fprintf(stdout, "Usage not available: remote command line\n");
 	}
 
-	
-	free(local_ports);
-	free(target_ports);
-	for(int i = 0; i < cconn; ++i)
-		free(addrs[i]);
-	free(addrs);
+	if (local_ports != NULL) free(local_ports);
+	if (target_ports != NULL) free(target_ports);
+	if (addrs != NULL) {
+		for(int i = 0; i < cconn; ++i)
+			free(addrs[i]);
+		free(addrs);
+	}
 	close_p2p(session);
 	return 0;
 }
@@ -265,7 +268,7 @@ void *manage_server(void *arg) {
 
 			// if atleast one connection is still maintained, continue
 			// exit otherwise
-			if (!(session[i+1]->connected == 0 && session[i+1]->active == 1))
+			if (!(session[i+cconn]->connected == 0 && session[i+cconn]->active == 1))
 				flag = 1;
 		}
 	}
