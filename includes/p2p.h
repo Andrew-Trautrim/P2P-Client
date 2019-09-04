@@ -16,6 +16,7 @@
 
 int sconn; // # of server connections
 int cconn; // # of client connections
+char use[2];
 char *local_ip; // local ip address
 
 /* structure maintains connection,

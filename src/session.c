@@ -12,7 +12,6 @@ int main(int argc, char **argv) {
 
 	sconn = cconn = 0;
 	int connect = 0, listen = 0;
-	int use = 0;
 	int opt, nbytes;
 	char *addr_list = NULL;
 	char *local_port_list = NULL, *target_port_list = NULL;
@@ -40,13 +39,13 @@ int main(int argc, char **argv) {
 				target_port_list = optarg;
 				break;
 			case 'c':
-				use = 1;
+				strcpy(use, "1");
 				break;
 			case 'f':
-				use = 2;
+				strcpy(use, "2");
 				break;
 			case 'r':
-				use = 3;
+				strcpy(use, "3");
 				break;
 			case '?':
 				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
@@ -88,7 +87,7 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 	// usage not specified, program must either deploy chatroom, file transfer, or remote command line
-	if (use == 0) {
+	if (0) {
 		fprintf(stderr, "Usage not specified, use \'-c\', \'-f\', or \'r\'\ntype \'h\' for help\n");
 		return -1;
 	}
@@ -125,7 +124,7 @@ int main(int argc, char **argv) {
 		for (int i = 0; i < cconn; ++i) {
 			strcpy(session[i]->ip, addrs[i]);
 			if (inet_pton(AF_INET, session[i]->ip, &session[i]->addr.sin_addr) <= 0) {
-				fprintf(stderr, "[!] Invalid address %s - error %d\n", session[i]->ip, errno);
+				fprintf(stderr, "[!] Invalid address \'%s\' - error %d\n", session[i]->ip, errno);
 			} else {
 				pthread_create(&cconnect[i], NULL, connect_p2p, session[i]);
 			}
@@ -142,7 +141,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Chat Room
-	if (use == 1) {
+	if (1) {
 
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
@@ -158,7 +157,7 @@ int main(int argc, char **argv) {
 		send_data(session);
 	}
 	// TODO: File Transfer
-	else if (use == 2) {
+	else if (0) {
 		fprintf(stdout, "Usage not available: file transfer\n");
 	}
 	// TODO: Remote CLI

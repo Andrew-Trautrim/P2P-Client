@@ -3,7 +3,7 @@
 /* returns 1 if all message details are the same, 0 otherwise */
 int compare(message msg1, message msg2) {
 
-	if (msg1.relay == 1 && msg2.relay == 1 && strcmp(msg1.sender, msg2.sender) == 0 && strcmp(msg1.origin, msg2.origin) == 0 && strcmp(msg1.msg, msg2.msg) == 0)
+	if (strcmp(msg1.sender, msg2.sender) == 0 && strcmp(msg1.origin, msg2.origin) == 0 && strcmp(msg1.msg, msg2.msg) == 0)
 		return 1;
 
 	return 0;
@@ -20,16 +20,17 @@ int send_data(p2p_struct **session) {
 		// input
 		fgets(msg.msg, 1024, stdin);
 		msg.msg[strlen(msg.msg)-1] = '\0';
-		strcpy(msg.sender, local_ip);
-		strcpy(msg.origin, local_ip);
+		strcpy(msg.sender, use);
+		strcpy(msg.origin, use);
 	
 		// send to all active connection(s)
 		for (int i = 0, n = cconn+sconn; i < n; ++i) {
-			if (session[i]->connected == 1) {
-				if (i < cconn) // client(s)
+			if (session[i]->connected == 1 && session[i]->active == 1) {
+				if (i < cconn) {// client(s)
 					nbytes = send(session[i]->socket, &msg, sizeof(msg), 0);
-				else // server(s)
+				} else { // server(s)
 					nbytes = send(session[i]->connection, &msg, sizeof(msg), 0);
+				}
 			}
 		}
 
@@ -59,7 +60,7 @@ void *broadcast_data(void *arg) {
 
 		// if a new message is recieved
 		// broadcast it to all connections
-		if (compare(msg, recieved_message)) {
+		if (compare(msg, recieved_message) != 1) {
 
 			// copies new message
 			strcpy(msg.sender, recieved_message.sender);
@@ -102,7 +103,7 @@ void *read_data(void *arg) {
 			strcpy(conn->ip, msg.origin);
 
 		if (strcmp("X", msg.msg) == 0) {
-			fprintf(stdout, "[!] %s disconnected\n", conn->ip);
+			fprintf(stdout, "[!] %s disconnected\n", msg.origin);
 			conn->connected = 0;
 			return NULL;
 		}
@@ -113,7 +114,7 @@ void *read_data(void *arg) {
 		fprintf(stdout, "[%s:%d] %s\n", msg.origin, conn->port, msg.msg);
 	} while (nbytes > 0);
 
-	fprintf(stdout, "[!] Unable to read data from %s - disconnected\n", conn->ip);
+	fprintf(stdout, "[!] Unable to read data from %s on port %d - disconnected\n", conn->ip, conn->port);
 	conn->connected = 0;
 	return NULL;
 }

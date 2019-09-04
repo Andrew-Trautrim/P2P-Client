@@ -6,7 +6,6 @@
 #define MSG_LEN 1024 // max length of recieved message
 
 typedef struct {
-    int relay;
     char sender[32];
     char origin[32];
     char msg[MSG_LEN];

@@ -28,8 +28,8 @@ void *connect_p2p(void *arg) {
 		return NULL;
 	}
 
-	client->connected = 1;
 	fprintf(stdout, "Connected to %s on port %d\n", client->ip, client->port);
+	client->connected = 1;
 	return NULL;
 }
 
