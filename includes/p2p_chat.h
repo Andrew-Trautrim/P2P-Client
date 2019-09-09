@@ -3,6 +3,11 @@
 
 #include "p2p.h"
 
+typedef struct {
+    char msg[1024];
+    char origin[32];
+} message;
+
 int send_data(p2p_struct **session); // sends data to all connections
 void *read_data(void *arg); // reads incoming data sent from client and/or server
 
