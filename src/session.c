@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
 	static char *options = "a:hln:p:t:cfr";
 
 	sconn = cconn = 0;
-	int connect = 0, listen = 0;
+	int use = 0, connect = 0, listen = 0;
 	int opt, nbytes;
 	char *addr_list = NULL;
 	char *local_port_list = NULL, *target_port_list = NULL;
@@ -39,13 +39,13 @@ int main(int argc, char **argv) {
 				target_port_list = optarg;
 				break;
 			case 'c':
-				strcpy(use, "1");
+				use = 1;
 				break;
 			case 'f':
-				strcpy(use, "2");
+				use = 2;
 				break;
 			case 'r':
-				strcpy(use, "3");
+				use = 3;
 				break;
 			case '?':
 				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
@@ -86,8 +86,8 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Improper usage, use \'-l\' and/or \'-a\' to connect\ntype \'-h\' for help\n");
 		return -1;
 	}
-	// usage not specified, program must either deploy chatroom, file transfer, or remote command line
-	if (0) {
+	// usage not specified, program must either execute chatroom, file transfer, or remote command line
+	if (use == 0) {
 		fprintf(stderr, "Usage not specified, use \'-c\', \'-f\', or \'r\'\ntype \'h\' for help\n");
 		return -1;
 	}
@@ -101,12 +101,12 @@ int main(int argc, char **argv) {
 	local_ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
 
 	// initiate structure
-	p2p_struct *session[cconn+sconn];
+	session = (p2p_struct**)calloc(cconn+sconn, sizeof(p2p_struct*));
 	for (int i = 0; i < cconn; ++i)
 		session[i] = init_p2p(target_ports[i]);
 	for (int i = 0; i < sconn; ++i)
 		session[i+cconn] = init_p2p(local_ports[i]);
-	
+
 	// multithreading, connecting to multiple addresses
 	pthread_t cconnect[cconn];
 	char **addrs = NULL;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
 			if (inet_pton(AF_INET, session[i]->ip, &session[i]->addr.sin_addr) <= 0) {
 				fprintf(stderr, "[!] Invalid address \'%s\' - error %d\n", session[i]->ip, errno);
 			} else {
-				pthread_create(&cconnect[i], NULL, connect_p2p, session[i]);
+				connect_p2p(i);
 			}
 		}
 	}
@@ -135,36 +135,33 @@ int main(int argc, char **argv) {
 	pthread_t slisten[sconn];
 	if (listen) {
 		for (int i = 0; i < sconn; ++i) {
-			pthread_create(&slisten[i], NULL, accept_p2p, session[i+cconn]);
-			sleep(0.1);
+			pthread_create(&slisten[i], NULL, accept_p2p, session[i]);
 		}
 	}
 
 	// Chat Room
-	if (1) {
+	if (use == 1) {
 
 		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
-		pthread_t broadcast, manage, read_client;
+		pthread_t manage, read_client;
 
 		// manages both server and client side connections
-		pthread_create(&manage, NULL, manage_chat, session);
-
-		// broadcasts recieved data to all connections
-		pthread_create(&broadcast, NULL, broadcast_data, session);
+		pthread_create(&manage, NULL, manage_chat, NULL);
 
 		// sends data to all connections
 		send_data(session);
 	}
 	// TODO: File Transfer
-	else if (0) {
+	else if (use == 2) {
 		fprintf(stdout, "Usage not available: file transfer\n");
 	}
 	// TODO: Remote CLI
-	else {
+	else if (use == 3) {
 		fprintf(stdout, "Usage not available: remote command line\n");
 	}
 
+	// memory deallocation
 	if (local_ports != NULL) free(local_ports);
 	if (target_ports != NULL) free(target_ports);
 	if (addrs != NULL) {
@@ -252,7 +249,6 @@ void print_usage() {
  */
 void *manage_chat(void *arg) {
 
-	p2p_struct **session = (p2p_struct**)arg;
 	pthread_t read[cconn+sconn];
 	int flag = 1;
 
