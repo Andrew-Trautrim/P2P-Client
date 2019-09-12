@@ -1,7 +1,7 @@
 #include "p2p_chat.h"
 
 /* sends user input to all established connections */
-int send_data(p2p_struct **session) {
+int send_data() {
 	
 	message msg;
 	strcpy(msg.origin, local_ip);
@@ -74,7 +74,7 @@ void *read_data(void *arg) {
 			}
 		}
 
-		fprintf(stdout, "[%s:%d] %s\n", (strcmp("UNKNOWN", conn->ip) == 0) ? msg.origin : conn->ip, conn->port, msg.msg); // display message output
+		fprintf(stdout, "[%s:%d] %s\n", msg.origin, conn->port, msg.msg); // display message output
 	} while (nbytes > 0);
 
 	fprintf(stdout, "[!] Unable to read data from %s on port %d - disconnected\n", conn->ip, conn->port);

@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
 	static char *options = "a:hln:p:t:cfr";
 
 	sconn = cconn = 0;
-	int use = 0, connect = 0, listen = 0;
+	int connect = 0, listen = 0;
 	int opt, nbytes;
 	char *addr_list = NULL;
 	char *local_port_list = NULL, *target_port_list = NULL;
@@ -37,15 +37,6 @@ int main(int argc, char **argv) {
 				break;
 			case 't':
 				target_port_list = optarg;
-				break;
-			case 'c':
-				use = 1;
-				break;
-			case 'f':
-				use = 2;
-				break;
-			case 'r':
-				use = 3;
 				break;
 			case '?':
 				fprintf(stderr, "Improper usage, use \'-h\' for help\n");
@@ -84,11 +75,6 @@ int main(int argc, char **argv) {
 	// network options not specified, program must listen and/or connect
 	if (!listen && !connect) {
 		fprintf(stderr, "Improper usage, use \'-l\' and/or \'-a\' to connect\ntype \'-h\' for help\n");
-		return -1;
-	}
-	// usage not specified, program must either execute chatroom, file transfer, or remote command line
-	if (use == 0) {
-		fprintf(stderr, "Usage not specified, use \'-c\', \'-f\', or \'r\'\ntype \'h\' for help\n");
 		return -1;
 	}
 
@@ -140,26 +126,14 @@ int main(int argc, char **argv) {
 	}
 
 	// Chat Room
-	if (use == 1) {
+	fprintf(stdout, "Chat Room, type 'X' to exit:\n");
 
-		fprintf(stdout, "Chat Room, type 'X' to exit:\n");
+	// manages both server and client side connections
+	pthread_t manage;
+	pthread_create(&manage, NULL, manage_chat, NULL);
 
-		pthread_t manage, read_client;
-
-		// manages both server and client side connections
-		pthread_create(&manage, NULL, manage_chat, NULL);
-
-		// sends data to all connections
-		send_data(session);
-	}
-	// TODO: File Transfer
-	else if (use == 2) {
-		fprintf(stdout, "Usage not available: file transfer\n");
-	}
-	// TODO: Remote CLI
-	else if (use == 3) {
-		fprintf(stdout, "Usage not available: remote command line\n");
-	}
+	// sends data to all connections
+	send_data(session);
 
 	// memory deallocation
 	if (local_ports != NULL) free(local_ports);
@@ -236,10 +210,12 @@ void print_usage() {
 	fprintf(stdout, "\t-n #            : maximum number of incoming connections\n");
 	fprintf(stdout, "\t-p p1,p2,...,pn : local ports for accepting connections\n");
 	fprintf(stdout, "\t-t p1,p2,...,pn : target ports for connecting\n");
+	/* 
 	fprintf(stdout, "interface options:\n");
 	fprintf(stdout, "\t-c              : chat room\n");
 	fprintf(stdout, "\t-f              : file transfer\n");
 	fprintf(stdout, "\t-r              : remote command line interface\n");
+	*/
 	return;
 }
 

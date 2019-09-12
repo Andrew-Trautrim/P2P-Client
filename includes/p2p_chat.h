@@ -8,7 +8,7 @@ typedef struct {
     char origin[32];
 } message;
 
-int send_data(p2p_struct **session); // sends data to all connections
+int send_data(); // sends data to all connections
 void *read_data(void *arg); // reads incoming data sent from client and/or server
 
 #endif

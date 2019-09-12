@@ -21,7 +21,7 @@ char *local_ip; // local ip address
 /* structure maintains connection,
  * can act as either client or server */
 typedef struct {
-	char ip[32]; // connection identification
+	char ip[16]; // connection identification
 	int active, connected, port;
 	int socket, connection; // sockets for connecting/accepting
 	struct sockaddr_in addr;
