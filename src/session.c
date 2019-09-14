@@ -102,7 +102,9 @@ int main(int argc, char **argv) {
 		for (int i = 0; i < cconn; ++i) {
 			strcpy(session[i]->ip, addrs[i]);
 			if (inet_pton(AF_INET, session[i]->ip, &session[i]->addr.sin_addr) <= 0) {
-				fprintf(stderr, "[!] Invalid address \'%s\' - error %d\n", session[i]->ip, errno);
+				fprintf(stderr, "[!] Invalid address \'%s\'\n", session[i]->ip);
+				session[i]->active = 1;
+				session[i]->connected = 0;
 			} else {
 				connect_p2p(session[i]);
 			}
@@ -229,6 +231,5 @@ void *manage_chat(void *arg) {
 				flag = 1;
 		}
 	}
-	printf("TEST\n");
 	return NULL;
 }

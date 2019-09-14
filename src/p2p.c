@@ -5,7 +5,7 @@ int connect_p2p(p2p_struct *conn) {
 
 	// creates client side socket
 	if ((conn->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "[!] Unable to create client side socket for %s - error %d\n", conn->ip, errno);
+		fprintf(stderr, "[!] Unable to create client side socket for %s - error %d\n", conn->ip, errno, strerror(errno));
 		return -1;
 	}
 
@@ -15,7 +15,7 @@ int connect_p2p(p2p_struct *conn) {
 
 	// client side connection
 	if (connect(conn->socket, (struct sockaddr*)&(conn->addr), sizeof(conn->addr)) == -1) {
-		fprintf(stderr, "[!] Unable to connect to %s - error %d\n", conn->ip, errno);
+		fprintf(stderr, "[!] Unable to connect to %s - error %d: %s\n", conn->ip, errno, strerror(errno));
 		return -1;
 	}
 
@@ -31,7 +31,6 @@ int connect_p2p(p2p_struct *conn) {
 /* allocates memory for the session and sets the port */
 p2p_struct *init_p2p(int port) {
 	p2p_struct *conn = (p2p_struct*)calloc(1, sizeof(p2p_struct));
-	strcpy(conn->ip, "UNKNOWN");
 	conn->connection = 0;
 	conn->active = 0;
 	conn->connected = 0;
@@ -57,7 +56,7 @@ void *accept_p2p(void *arg) {
 
 	// creates server side socket
 	if ((conn->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "[!] Unable to create server side socket - error %d\n", errno);
+		fprintf(stderr, "[!] Unable to create server side socket - error %d: %s\n", errno), strerror(errno);
 		return NULL;
 	}
 
@@ -68,14 +67,14 @@ void *accept_p2p(void *arg) {
 
 	// binds socket to port
 	if (bind(conn->socket, (struct sockaddr*)&(conn->addr), sizeof(conn->addr)) < 0) {
-		fprintf(stderr, "[!] Unable to bind port %d - error %d\n", conn->port, errno);
+		fprintf(stderr, "[!] Unable to bind port %d - error %d: %s\n", conn->port, errno, strerror(errno));
 		return NULL;
 	}
 
 	// listen on socket/port
 	// maximum of 1 pending connection
 	if (listen(conn->socket, 1) < 0) {
-		fprintf(stderr, "[!] Unable to listen on port %d - error %d\n",conn->port, errno);
+		fprintf(stderr, "[!] Unable to listen on port %d - error %d: %s\n",conn->port, errno, strerror(errno));
 		return NULL;
 	}
 
@@ -83,7 +82,7 @@ void *accept_p2p(void *arg) {
 
 	int addrlen = sizeof(conn->addr);
 	if((conn->connection = accept(conn->socket, (struct sockaddr*)&(conn->addr), (socklen_t*)&addrlen)) < 0) {
-		fprintf(stderr, "[!] Connection failure - error %d\n", errno);
+		fprintf(stderr, "[!] Connection failure - error %d: %s\n", errno, strerror(errno));
 		return NULL;
 	}
 
