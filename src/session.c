@@ -78,14 +78,6 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	// set local information
-	char host_buffer[256];
-	struct hostent *host_entry;
-	int host_name;
-	host_name = gethostname(host_buffer, sizeof(host_buffer));
-	host_entry = gethostbyname(host_buffer);
-	local_ip = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
-
 	// initiate structure
 	session = (p2p_struct**)calloc(cconn+sconn, sizeof(p2p_struct*));
 	for (int i = 0; i < cconn; ++i)
@@ -112,7 +104,7 @@ int main(int argc, char **argv) {
 			if (inet_pton(AF_INET, session[i]->ip, &session[i]->addr.sin_addr) <= 0) {
 				fprintf(stderr, "[!] Invalid address \'%s\' - error %d\n", session[i]->ip, errno);
 			} else {
-				connect_p2p(i);
+				connect_p2p(session[i]);
 			}
 		}
 	}
@@ -210,12 +202,6 @@ void print_usage() {
 	fprintf(stdout, "\t-n #            : maximum number of incoming connections\n");
 	fprintf(stdout, "\t-p p1,p2,...,pn : local ports for accepting connections\n");
 	fprintf(stdout, "\t-t p1,p2,...,pn : target ports for connecting\n");
-	/* 
-	fprintf(stdout, "interface options:\n");
-	fprintf(stdout, "\t-c              : chat room\n");
-	fprintf(stdout, "\t-f              : file transfer\n");
-	fprintf(stdout, "\t-r              : remote command line interface\n");
-	*/
 	return;
 }
 
@@ -243,5 +229,6 @@ void *manage_chat(void *arg) {
 				flag = 1;
 		}
 	}
+	printf("TEST\n");
 	return NULL;
 }

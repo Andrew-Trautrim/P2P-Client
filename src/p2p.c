@@ -1,26 +1,30 @@
 #include "p2p.h"
 
 /* function connects to an existing server node in p2p network (client side) */
-int connect_p2p(int i) {
+int connect_p2p(p2p_struct *conn) {
 
 	// creates client side socket
-	if ((session[i]->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "[!] Unable to create client side socket for %s - error %d\n", session[i]->ip, errno);
+	if ((conn->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "[!] Unable to create client side socket for %s - error %d\n", conn->ip, errno);
 		return -1;
 	}
 
 	// connection settings
-	session[i]->addr.sin_family = AF_INET;
-	session[i]->addr.sin_port = htons(session[i]->port);
+	conn->addr.sin_family = AF_INET;
+	conn->addr.sin_port = htons(conn->port);
 
 	// client side connection
-	if (connect(session[i]->socket, (struct sockaddr*)&(session[i]->addr), sizeof(session[i]->addr)) == -1) {
-		fprintf(stderr, "[!] Unable to connect to %s - error %d\n", session[i]->ip, errno);
+	if (connect(conn->socket, (struct sockaddr*)&(conn->addr), sizeof(conn->addr)) == -1) {
+		fprintf(stderr, "[!] Unable to connect to %s - error %d\n", conn->ip, errno);
 		return -1;
 	}
 
-	fprintf(stdout, "Connected to %s on port %d\n", session[i]->ip, session[i]->port);
-	session[i]->connected = 1;
+	// determine local ip address for connection
+	int len = sizeof(struct sockaddr);
+	getsockname(conn->socket, (struct sockaddr*)&conn->addr, &len);
+
+	fprintf(stdout, "Connected to %s on port %d\n", conn->ip, conn->port);
+	conn->connected = 1;
 	return 1;
 }
 
@@ -82,6 +86,10 @@ void *accept_p2p(void *arg) {
 		fprintf(stderr, "[!] Connection failure - error %d\n", errno);
 		return NULL;
 	}
+
+	// determine local ip address for connection
+	int len = sizeof(struct sockaddr);
+	getsockname(conn->connection, (struct sockaddr*)&conn->addr, &len);
 
 	//read(server->connection, server->ip, sizeof(server->ip));
 	fprintf(stdout, "port %d connected\n", conn->port);

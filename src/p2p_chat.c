@@ -4,10 +4,12 @@
 int send_data() {
 	
 	message msg;
-	strcpy(msg.origin, local_ip);
 	int nbytes;
+	int flag = 1;
 
 	do {
+
+		flag = 0;
 
 		// input
 		fgets(msg.msg, 1024, stdin);
@@ -16,14 +18,20 @@ int send_data() {
 		// send to all active connection(s)
 		for (int i = 0, n = cconn+sconn; i < n; ++i) {
 			if (session[i]->connected == 1 && session[i]->active == 1) {
+				strcpy(msg.origin, inet_ntoa(session[i]->addr.sin_addr));
 				if (i < cconn) { // client(s)
 					nbytes = send(session[i]->socket, &msg, sizeof(msg), 0);
 				} else { // server(s)
 					nbytes = send(session[i]->connection, &msg, sizeof(msg), 0);
 				}
 			}
+
+			// if atleast one connection is still maintained, continue
+			// exit otherwise
+			if (!(session[i]->connected == 0 && session[i]->active == 1))
+				flag = 1;
 		}
-	} while (nbytes >= 0 && strcmp("X", msg.msg) != 0);
+	} while (nbytes >= 0 && strcmp("X", msg.msg) != 0 && flag == 1);
 
 	if (nbytes < 0) {
 		fprintf(stderr, "[!] Unable to send data\n");
@@ -41,7 +49,7 @@ void *read_data(void *arg) {
 	message msg;
 
 	for (int i = 0, n = cconn+sconn; i < n; ++i) {
-		if (strcmp(session[i]->ip, conn->ip) == 0 && session[i]->ip == conn->ip) {
+		if (session[i] == conn) {
 			index = i;
 			break;
 		}
@@ -55,6 +63,13 @@ void *read_data(void *arg) {
 		else
 			nbytes = read(conn->connection, &msg, sizeof(msg));
 
+		// 'X' terminates connection
+		if (strcmp("X", msg.msg) == 0) {
+			fprintf(stdout, "[!] %s disconnected\n", msg.origin);
+			conn->connected = 0;
+			return NULL;
+		}
+
 		// broadcast data to other connections
 		for (int i = 0, n = cconn+sconn; i < n; ++i) {
 			if (i != index && session[i]->active == 1 && session[i]->connected == 1) {
@@ -63,14 +78,6 @@ void *read_data(void *arg) {
 				} else if (session) { // server(s)
 					nbytes = send(session[i]->connection, &msg, sizeof(msg), 0);
 				}
-			}
-		}
-
-		if (strcmp("X", msg.msg) == 0) {
-			fprintf(stdout, "[!] %s disconnected\n", msg.origin);
-			if (strcmp(msg.origin, conn->ip) == 0) { // if connection leaves, terminates thread
-				conn->connected = 0;
-				return NULL;
 			}
 		}
 
