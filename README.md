@@ -8,43 +8,44 @@ Command line usage:
 root@linux:~/P2P-Client# ./bin/session 
 Improper usage, use '-l' and/or '-a' to connect
 type '-h' for help
-root@linux:~/P2P-Client/bin# ./session -h
-usage: ./session &ltoptions&gt
+root@linux:~/P2P-Client# ./bin/session -h
+usage: ./session <options>
 
 options:
-	-a address : connect to target address
-	-h	   : display help options
-	-l	   : listen for incoming connections
-	-n max #   : maximum number of incoming connections
-	-p port	   : local port for accepting connections
-	-t port    : target port for connecting
+	-a a1,a2,...,an : connect to target addresses
+	-h              : display help options
+	-l              : listen for incoming connections
+	-n #            : maximum number of incoming connections
+	-p p1,p2,...,pn : local ports for accepting connections
+	-t p1,p2,...,pn : target ports for connecting
 </pre>
 
 Program execution:  
 listening for incoming connections,
 <pre>
-root@linux:~/P2P-Client/bin# ./session -l -n 5 -p 18
+root@linux:~/P2P-Client# ./bin/session -l -p 18,22,80,52
 Listening on port 18
-Listening on port 19
-Listening on port 20
-Listening on port 21
 Listening on port 22
-Session (type 'X' to exit): 
-78.69.87.84 connected on port 20
-What makes you think she's a witch?
-[78.69.87.84] She turned me into a newt.
+Listening on port 80
+Listening on port 52
+Chat Room, type 'X' to exit: 
+port 18 connected
+[78.69.87.84:18] She's a witch!
+what makes you think she's a witch?
+[78.69.87.84:18] She turned me into a newt.
 A newt?
-[78.69.87.84] ...I got better.
+[78.69.87.84:18] ...I got better
 [!] 78.69.87.84 disconnected
 </pre>
 connect to target address,
 <pre>
 root@linux:~/P2P-Client/bin# ./session -a 10.0.58.1 -t 20
-Connected to 87.73.83.69
-Session (type 'X' to exit): 
-[87.73.83.69] What makes you think she's a witch?
+Connected to 87.73.83.69:18
+Chat Room, type 'X' to exit:
+She's a witch!
+[87.73.83.69:18] what makes you think she's a witch?
 She turned me into a newt.
-[87.73.83.69] A newt?
-...I got better.
+[87.73.83.69:18] A newt?
+...I got better
 X
 </pre>
