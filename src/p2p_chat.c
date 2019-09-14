@@ -66,6 +66,8 @@ void *read_data(void *arg) {
 		// 'X' terminates connection
 		if (strcmp("X", msg.msg) == 0) {
 			fprintf(stdout, "[!] %s disconnected\n", msg.origin);
+			close(session[index]->socket);
+			close(session[index]->connection);
 			conn->connected = 0;
 			return NULL;
 		}
@@ -84,7 +86,7 @@ void *read_data(void *arg) {
 		fprintf(stdout, "[%s:%d] %s\n", msg.origin, conn->port, msg.msg); // display message output
 	} while (nbytes > 0);
 
-	fprintf(stdout, "[!] Unable to read data from %s on port %d - disconnected\n", conn->ip, conn->port);
+	fprintf(stdout, "[!] Unable to read data from %s on port %d - disconnected\n", msg.origin, conn->port);
 	conn->connected = 0;
 	return NULL;
 }

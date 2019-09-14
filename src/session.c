@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
 	pthread_t slisten[sconn];
 	if (listen) {
 		for (int i = 0; i < sconn; ++i) {
-			pthread_create(&slisten[i], NULL, accept_p2p, session[i]);
+			pthread_create(&slisten[i], NULL, accept_p2p, session[i+cconn]);
 		}
 	}
 
@@ -214,6 +214,7 @@ void print_usage() {
 void *manage_chat(void *arg) {
 
 	pthread_t read[cconn+sconn];
+	pthread_t slisten[sconn];
 	int flag = 1;
 
 	while (flag) {
@@ -225,10 +226,14 @@ void *manage_chat(void *arg) {
 				pthread_create(&read[i], NULL, read_data, session[i]);
 			}
 
-			// if atleast one connection is still maintained, continue
-			// exit otherwise
-			if (!(session[i]->connected == 0 && session[i]->active == 1))
+			// listens for new connections if a connection is dropped
+			if (session[i]->connected == 0 && session[i]->active == 1 && i >= cconn) {
+				session[i]->active = 0;
+				pthread_create(&slisten[i-cconn], NULL, accept_p2p, session[i]);
 				flag = 1;
+			} else if (!(session[i]->connected == 0 && session[i]->active == 1)) {
+				flag = 1;
+			}
 		}
 	}
 	return NULL;
