@@ -1,14 +1,11 @@
 # P2P-Client
-Peer to peer client written in C
+Peer to peer network written in C
 
 A P2P client works by created a connection over the internet directly from computer to computer (or peer to peer). The connection is done without the need for a central server as each connected device acts as both server and client to maintain the network. Once a connection is created, devices can send and recieve messages, run commands, and search directories.
 
 Command line usage:
 <pre>
-root@linux:~/P2P-Client# ./bin/session 
-Improper usage, use '-l' and/or '-a' to connect
-type '-h' for help
-root@linux:~/P2P-Client# ./bin/session -h
+root@linux:~/P2P-network# ./bin/session -h
 usage: ./session <options>
 
 options:
@@ -23,7 +20,7 @@ options:
 Program execution:  
 listening for incoming connections,
 <pre>
-root@linux:~/P2P-Client# ./bin/session -l -p 18,22,80,52
+root@linux:~/P2P-network# ./bin/session -l -p 18,22,80,52
 Listening on port 18
 Listening on port 22
 Listening on port 80
@@ -39,7 +36,7 @@ A newt?
 </pre>
 connect to target address,
 <pre>
-root@linux:~/P2P-Client/bin# ./session -a 10.0.58.1 -t 20
+root@linux:~/P2P-network/bin# ./session -a 10.0.58.1 -t 20
 Connected to 87.73.83.69:18
 Chat Room, type 'X' to exit:
 She's a witch!
